@@ -1,0 +1,302 @@
+[
+  {
+    "id": "t001",
+    "text": "i am a down to earth person and say what i feel very affectionate",
+    "groundTruth": "love"
+  },
+  {
+    "id": "t002",
+    "text": "i felt happy when i received the letter telling me that i had been admitted to the university",
+    "groundTruth": "joy"
+  },
+  {
+    "id": "t003",
+    "text": "i remember feeling a little jealous and realized that our time together wasnt solely about me but that he has a larger network of social interactions all ready in progress before i got there",
+    "groundTruth": "anger"
+  },
+  {
+    "id": "t004",
+    "text": "i feel like a cold object with no identity",
+    "groundTruth": "anger"
+  },
+  {
+    "id": "t005",
+    "text": "i have a feeling its the kind of thing logan would have admired and hes the last person on earth would have ever betrayed that trust",
+    "groundTruth": "love"
+  },
+  {
+    "id": "t006",
+    "text": "i can say that once again after the test drive we left feeling impressed by the cx and with steve and adams assistance",
+    "groundTruth": "surprise"
+  },
+  {
+    "id": "t007",
+    "text": "i think im getting the feeling that were the weird ones for using dryers most of the time",
+    "groundTruth": "surprise"
+  },
+  {
+    "id": "t008",
+    "text": "i love the feeling of running in the cold when you can see your breath and cold air seems to refresh you from the inside out",
+    "groundTruth": "anger"
+  },
+  {
+    "id": "t009",
+    "text": "i feel so grouchy and irritable when im sick",
+    "groundTruth": "anger"
+  },
+  {
+    "id": "t010",
+    "text": "i feel so fucked up most of the time because not being able to concentrate on anything amp feeling anxiety all the time about everything makes me stressed apathetic amp i cant handle stress at all",
+    "groundTruth": "anger"
+  },
+  {
+    "id": "t011",
+    "text": "i had to stand in front of sinks and odkh milk in front of all the women who were entering the bathroom she said i feel offended and i try hard not to cry took",
+    "groundTruth": "anger"
+  },
+  {
+    "id": "t012",
+    "text": "i feel so shitty right now i just arugh",
+    "groundTruth": "sadness"
+  },
+  {
+    "id": "t013",
+    "text": "i feel permanently heartbroken but at the same time if she were to ask me out again i would mend it right up and do it again",
+    "groundTruth": "sadness"
+  },
+  {
+    "id": "t014",
+    "text": "i love those ted talks i feel intimidated more than inspired because greater than great can be found in simplicity too",
+    "groundTruth": "fear"
+  },
+  {
+    "id": "t015",
+    "text": "i feel like learning not to judge people is the most important thing we can take away from this reading",
+    "groundTruth": "joy"
+  },
+  {
+    "id": "t016",
+    "text": "i feel more vulnerable and more in touch with my heart with making choices that are better for myself and my family and less worried about pleasing everyone else",
+    "groundTruth": "fear"
+  },
+  {
+    "id": "t017",
+    "text": "i was cut into feeling pain that shocked me",
+    "groundTruth": "surprise"
+  },
+  {
+    "id": "t018",
+    "text": "i am nowhere near finished but how much better do i feel its ludicrous",
+    "groundTruth": "surprise"
+  },
+  {
+    "id": "t019",
+    "text": "i also feel amazed happy fortunate and extremely blessed",
+    "groundTruth": "surprise"
+  },
+  {
+    "id": "t020",
+    "text": "i was like that i always wanted to feel and be accepted by my family and others",
+    "groundTruth": "love"
+  },
+  {
+    "id": "t021",
+    "text": "i feel affectionate toward the friends ive made online and admire their spirits and talents",
+    "groundTruth": "love"
+  },
+  {
+    "id": "t022",
+    "text": "im being particular but id feel uncomfortable even asserting ive ever been in love",
+    "groundTruth": "fear"
+  },
+  {
+    "id": "t023",
+    "text": "i guess being the good friend that he is he can not and will not allow me to go on with life feeling so distressed and confused",
+    "groundTruth": "fear"
+  },
+  {
+    "id": "t024",
+    "text": "im so stoned on endorphin that all i can feel is my leg muscles seizing into petrified meat",
+    "groundTruth": "fear"
+  },
+  {
+    "id": "t025",
+    "text": "i would feel weird having my dads hand on my stomach for any amount of time especially for several minutes while he waits to feel taryn jumping around in there",
+    "groundTruth": "surprise"
+  },
+  {
+    "id": "t026",
+    "text": "i feel just complain that companies are becoming too rich because of the taxes imposed upon them",
+    "groundTruth": "joy"
+  },
+  {
+    "id": "t027",
+    "text": "i realize that the vision that i had for it at the beginning is not what i feel passionate about any more",
+    "groundTruth": "love"
+  },
+  {
+    "id": "t028",
+    "text": "i admire makes me feel amazed at my life",
+    "groundTruth": "surprise"
+  },
+  {
+    "id": "t029",
+    "text": "i may feel that way but the fact that stories created by adults that are meant for children contain messages that are not so innocent really makes me wonder who exactly is more mature",
+    "groundTruth": "joy"
+  },
+  {
+    "id": "t030",
+    "text": "i feel ignored and if he does message me tomorrow should i do the same to him",
+    "groundTruth": "sadness"
+  },
+  {
+    "id": "t031",
+    "text": "i feel like i have to make the suffering i m seeing mean something",
+    "groundTruth": "sadness"
+  },
+  {
+    "id": "t032",
+    "text": "i still feel a little dazed and have that sort of disbelieving feeling of oh my god",
+    "groundTruth": "surprise"
+  },
+  {
+    "id": "t033",
+    "text": "i remember feeling outraged to my core when i read a particularly heinous series of articles in the friday times where else if not this paper",
+    "groundTruth": "anger"
+  },
+  {
+    "id": "t034",
+    "text": "i had ritz crackers in my desk drawer because theyre something ill eat even when i feel crappy and or dont feel like eating",
+    "groundTruth": "sadness"
+  },
+  {
+    "id": "t035",
+    "text": "i had to work in one i would not feel quite so affectionate",
+    "groundTruth": "love"
+  },
+  {
+    "id": "t036",
+    "text": "i feel so lucky that my parents made a point to take us everywhere and anywhere they could",
+    "groundTruth": "joy"
+  },
+  {
+    "id": "t037",
+    "text": "i remember amsterdam where the circumstances were difficult and i was feeling melancholy",
+    "groundTruth": "sadness"
+  },
+  {
+    "id": "t038",
+    "text": "i often fought feelings of hopelessness because of our seemingly helpless financial situation",
+    "groundTruth": "fear"
+  },
+  {
+    "id": "t039",
+    "text": "i know now and i knew then that it was a season of learning about trusting god and i do feel more peaceful and calm because of it",
+    "groundTruth": "joy"
+  },
+  {
+    "id": "t040",
+    "text": "i always feel intimidated by other people especially when they always compare me to other people ever since i was young",
+    "groundTruth": "fear"
+  },
+  {
+    "id": "t041",
+    "text": "i feel like my songs are pretty lame and elementary but they like them",
+    "groundTruth": "sadness"
+  },
+  {
+    "id": "t042",
+    "text": "i went blonde i was feeling adventurous and a little lost in who i was as a person",
+    "groundTruth": "joy"
+  },
+  {
+    "id": "t043",
+    "text": "i made for the bee has left me feeling pretty terrific",
+    "groundTruth": "joy"
+  },
+  {
+    "id": "t044",
+    "text": "i know i am not alone in this feeling and a supportive community is the antidote",
+    "groundTruth": "love"
+  },
+  {
+    "id": "t045",
+    "text": "im feeling generous lets make it a a href https www",
+    "groundTruth": "love"
+  },
+  {
+    "id": "t046",
+    "text": "i feel you jerked a little surprised at the hand that touched you",
+    "groundTruth": "surprise"
+  },
+  {
+    "id": "t047",
+    "text": "i take things very personally when i feel wronged even little memories stay with me",
+    "groundTruth": "anger"
+  },
+  {
+    "id": "t048",
+    "text": "i was feeling relatively indecisive and not very hungry until we walked past a barbeque place",
+    "groundTruth": "fear"
+  },
+  {
+    "id": "t049",
+    "text": "i feel greedy about wanting to see this film series continue",
+    "groundTruth": "anger"
+  },
+  {
+    "id": "t050",
+    "text": "i winced and said that does not feel funny",
+    "groundTruth": "surprise"
+  },
+  {
+    "id": "t051",
+    "text": "ive been feeling the desire for a romantic interest even with my circumstances i feel as though im emotionally ready for a special someone in my life",
+    "groundTruth": "love"
+  },
+  {
+    "id": "t052",
+    "text": "i feel like i get more and more frantic with no clue which way to turn what direction my life is going or if i should even care",
+    "groundTruth": "fear"
+  },
+  {
+    "id": "t053",
+    "text": "i feel really bless to have a very supportive family who appreciate everything that i do",
+    "groundTruth": "love"
+  },
+  {
+    "id": "t054",
+    "text": "i feel like a beaten pi ata spewing unhealthy emotions and defeat",
+    "groundTruth": "sadness"
+  },
+  {
+    "id": "t055",
+    "text": "i also feel more welcomed at lush than any other job that i have had",
+    "groundTruth": "joy"
+  },
+  {
+    "id": "t056",
+    "text": "i feel blackburn will be a stubborn team against blackpool and holloway will want a positive reaction in this game even if they don get a result",
+    "groundTruth": "anger"
+  },
+  {
+    "id": "t057",
+    "text": "i see jacque i feel extremely guilty because she still hasn t forgiven me",
+    "groundTruth": "sadness"
+  },
+  {
+    "id": "t058",
+    "text": "i am wearing heels i feel more self assured",
+    "groundTruth": "joy"
+  },
+  {
+    "id": "t059",
+    "text": "ive been feeling a bit shitty about myself these past few days and there has been a sudden drop of self esteem going on",
+    "groundTruth": "sadness"
+  },
+  {
+    "id": "t060",
+    "text": "i always feel very threatened by her when it comes to guys cox you no she gets a lot of contact with the guys i like like my first and bf",
+    "groundTruth": "fear"
+  }
+]
