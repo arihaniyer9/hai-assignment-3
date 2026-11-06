@@ -1,249 +1,155 @@
 /**
  * e2e/flow.spec.ts
  *
- * Scripted end-to-end run of the whole study, as real participants and as the
- * researcher. It also produces the screenshots required by the assignment in
- * docs/screenshots/:
- *
- *   participant-instructions.png   instructions + consent page
- *   participant-task-desktop.png   labeling screen (desktop)
- *   participant-task-mobile.png    labeling screen (390 px phone)
- *   participant-debrief.png        thank-you / debrief page
- *   admin-data.png                 the collected data (who labeled what)  <- deliverable
- *
- * Tests run in order and share one database: participant A (desktop, with a
- * mid-task page reload), participant B (desktop), participant C (mobile),
- * then the admin checks.
+ * Scripted end-to-end runs of both conditions against a throwaway SQLite database, as real
+ * participants and as the researcher. Tests run in order and share the database. They also write
+ * the interface screenshots used in the report to docs/screenshots/.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { ADMIN_PASSWORD } from "../playwright.config";
+import { CATCH_TEXT, TOTAL, answerStep, captureApi, passCheck, start } from "./helpers";
 
 const SHOTS = "docs/screenshots";
-const LABEL_NAMES = ["Anger", "Fear", "Joy", "Love", "Sadness", "Surprise", "None of these / Unsure"];
-
-/** Everything a scripted participant did, for later assertions. */
-interface Run {
-  participantId: string;
-  tweets: string[];
-  labels: string[];
-}
-
-/**
- * Collects the JSON bodies of all participant API responses so tests can
- * assert that no ground truth is served before submission.
- *
- * @param page The page to observe.
- * @returns A live array of `{ url, body }` entries.
- */
-function captureApiBodies(page: Page) {
-  const seen: { url: string; body: string }[] = [];
-  page.on("response", async (res) => {
-    if (res.url().includes("/api/participants")) {
-      seen.push({ url: res.url(), body: await res.text().catch(() => "") });
-    }
-  });
-  return seen;
-}
-
-/**
- * Starts a fresh participant from the home page (consent + optional nickname).
- *
- * @param page The page to drive.
- * @param nickname Nickname to type (may be empty).
- */
-async function startTask(page: Page, nickname: string) {
-  await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Label the emotion in 5 tweets");
-  const start = page.getByRole("button", { name: "Start the task" });
-  await expect(start).toBeDisabled(); // consent required
-  if (nickname) await page.getByLabel("Nickname (optional)").fill(nickname);
-  await page.getByRole("checkbox").check();
-  await expect(start).toBeEnabled();
-  await start.click();
-  await expect(page).toHaveURL(/\/task$/);
-}
-
-/**
- * Labels all 5 tweets, one screen at a time, and submits.
- *
- * @param page The page to drive (already on /task).
- * @param picks The 5 label names to choose, in order.
- * @param opts.reloadAt Reload the page after saving this many tweets (tests resume).
- * @param opts.shot Screenshot path for the first labeling screen.
- * @returns What the participant saw and chose.
- */
-async function labelFiveTweets(
-  page: Page,
-  picks: string[],
-  opts: { reloadAt?: number; shot?: string } = {},
-): Promise<Run> {
-  const tweets: string[] = [];
-  for (let i = 0; i < 5; i++) {
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(`Tweet ${i + 1} of 5`);
-    tweets.push((await page.locator(".tweet-card__text").innerText()).trim());
-
-    const next = page.getByRole("button", { name: i === 4 ? "Submit" : "Next", exact: true });
-    await expect(next).toBeDisabled(); // nothing chosen yet
-    // Desktop: whole page. Phone: just the viewport, exactly as the participant sees it (sticky Back/Next bar).
-    if (i === 0 && opts.shot) await page.screenshot({ path: opts.shot, fullPage: !opts.shot.includes("mobile") });
-
-    await page.getByRole("radio", { name: picks[i], exact: true }).check();
-    await expect(next).toBeDisabled(); // confidence still missing
-    await page.getByRole("radio", { name: new RegExp(`^${(i % 5) + 1} of 5`) }).check();
-    if (i === 0) await page.getByLabel(/Why did you choose this/).fill("Words like these usually signal this feeling.");
-    await expect(next).toBeEnabled();
-    await next.click();
-
-    if (opts.reloadAt === i + 1) {
-      // Refresh mid-task: the session must resume at the next unanswered tweet.
-      await page.reload();
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(`Tweet ${i + 2} of 5`);
-      // ...and going Back must show the earlier saved answer.
-      await page.getByRole("button", { name: "Back" }).click();
-      await expect(page.getByRole("radio", { name: picks[i], exact: true })).toBeChecked();
-      await page.getByRole("button", { name: "Next", exact: true }).click();
-    }
-  }
-  await expect(page).toHaveURL(/\/done$/);
-  const participantId = (await page.locator(".id-chip").innerText()).trim();
-  expect(participantId).toMatch(/^P-[A-Z2-9]{6}$/);
-  return { participantId, tweets, labels: picks };
-}
-
-const runs: Run[] = [];
+const CODE = "otter-42";
+const seen: Record<string, string[]> = {};
 
 test.describe.serial("participant flow", () => {
-  test("A: desktop participant labels 5 tweets, survives a reload, sees the debrief", async ({ page }) => {
-    const bodies = captureApiBodies(page);
+  test("baseline: instructions, check (one retry), 21 headlines with a reload, comment, score", async ({ page }) => {
+    const api = captureApi(page);
+    await page.goto("/baseline");
+    await page.screenshot({ path: `${SHOTS}/baseline-instructions.png`, fullPage: true });
+    await start(page, "baseline", "  Otter-42 ");
 
-    await page.goto("/");
-    await page.screenshot({ path: `${SHOTS}/participant-instructions.png`, fullPage: true, caret: "initial" });
-    await startTask(page, "E2E Tester");
+    // A wrong answer explains the rule and allows one more try.
+    await page.getByRole("radio", { name: /funny or hard to believe/ }).check();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.locator("main [role=alert]")).toContainText("who published the headline");
+    await passCheck(page);
 
-    // Keyboard shortcut: pressing "3" selects Joy on the first tweet (wait for the screen to load first).
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Tweet 1 of 5");
-    await page.keyboard.press("3");
-    await expect(page.getByRole("radio", { name: "Joy", exact: true })).toBeChecked();
+    const headlines: string[] = [];
+    for (let i = 1; i <= TOTAL; i++) {
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(`Headline ${i} of ${TOTAL}`);
+      if (i === 1) await page.screenshot({ path: `${SHOTS}/baseline-trial.png`, fullPage: true });
+      await expect(page.locator(".ai-panel")).toHaveCount(0); // never an AI in the baseline
+      headlines.push(await answerStep(page, i % 2 ? "Satire" : "Real"));
+      if (i === 5) {
+        await page.reload(); // resumes at the next unanswered headline
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText(`Headline 6 of ${TOTAL}`);
+      }
+    }
+    expect(headlines).toContain(CATCH_TEXT);
+    seen.baseline = headlines.filter((h) => h !== CATCH_TEXT);
 
-    const run = await labelFiveTweets(page, ["Joy", "Anger", "Fear", "None of these / Unsure", "Love"], {
-      reloadAt: 2,
-      shot: `${SHOTS}/participant-task-desktop.png`,
-    });
-    runs.push(run);
-
-    // Debrief reveals dataset labels only now.
+    await page.getByLabel(/Anything you want to tell us/).fill("I looked for absurd premises.");
+    await page.getByRole("button", { name: "Finish" }).click();
     await expect(page.getByRole("heading", { name: "Thank you!" })).toBeVisible();
-    await expect(page.locator(".debrief-item")).toHaveCount(5);
-    await page.screenshot({ path: `${SHOTS}/participant-debrief.png`, fullPage: true });
+    await expect(page.locator(".lede")).toContainText(/of 20/);
+    await expect(page.locator(".id-chip")).toHaveText(CODE); // normalised code
+    await page.screenshot({ path: `${SHOTS}/done.png`, fullPage: true });
 
-    // 5 distinct tweets, and no ground truth in ANY response before /complete.
-    expect(new Set(run.tweets).size).toBe(5);
-    const beforeSubmit = bodies.filter((b) => !b.url.endsWith("/complete") && !b.url.endsWith("/results"));
-    expect(beforeSubmit.length).toBeGreaterThan(5);
-    for (const b of beforeSubmit) expect(b.body.toLowerCase()).not.toContain("groundtruth");
-    const debrief = bodies.find((b) => b.url.endsWith("/complete"));
-    expect(debrief?.body).toContain("groundTruth");
+    // No session response ever carried the answer key.
+    for (const { body } of api) {
+      const parsed = JSON.parse(body || "{}");
+      for (const t of parsed.trials ?? parsed.state?.trials ?? []) {
+        expect(Object.keys(t)).not.toContain("label");
+        expect(Object.keys(t)).not.toContain("type");
+      }
+    }
   });
 
-  test("A: a completed browser cannot start again but can reset for testing", async ({ page }) => {
-    // Same browser context is not shared between tests, so emulate by revisiting with stored ID.
-    await page.goto("/");
-    await page.evaluate((id) => localStorage.setItem("emotion-task.participantId", id), runs[0].participantId);
-    await page.reload();
-    await expect(page.getByRole("heading", { name: /already taken part/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Start the task" })).toHaveCount(0);
-    await page.getByRole("button", { name: "Start new participant (testing)" }).click();
-    await expect(page.getByRole("heading", { name: "Ready to start?" })).toBeVisible();
+  test("assisted, same code: own answer, then live AI, then final answer; no repeated headlines", async ({ page }) => {
+    await start(page, "assisted", CODE);
+    await passCheck(page);
+    const headlines: string[] = [];
+    for (let i = 1; i <= TOTAL; i++) {
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(`Headline ${i} of ${TOTAL}`);
+      if (i === 1) await page.screenshot({ path: `${SHOTS}/assisted-own-answer.png`, fullPage: true });
+      const text = await answerStep(page, "Real", 2);
+      headlines.push(text);
+      if (text === CATCH_TEXT) continue; // no AI on the attention check
+
+      // The AI appears only now, with the own answer recapped and locked.
+      await expect(page.locator(".ai-panel")).toBeVisible();
+      await expect(page.locator(".recap")).toContainText("Your own answer: Real, confidence 2 of 5");
+      await expect(page.locator(".ai-panel__verdict")).toContainText(/The AI suggests (Satire|Real), \d+% sure/);
+      await expect(page.getByRole("radio", { name: /^Real\b/ })).toBeChecked(); // pre-filled
+      if (i === 1) await page.screenshot({ path: `${SHOTS}/assisted-ai.png`, fullPage: true });
+
+      if (i === 2) {
+        // A reload on the AI step shows the same, logged AI output.
+        const before = await page.locator(".ai-panel").innerText();
+        await page.reload();
+        await expect(page.locator(".ai-panel")).toBeVisible();
+        expect(await page.locator(".ai-panel").innerText()).toBe(before);
+      }
+      await answerStep(page, i % 3 ? "Real" : "Satire", 4);
+    }
+    const study = headlines.filter((h) => h !== CATCH_TEXT);
+    expect(study).toHaveLength(20);
+    expect(study.filter((h) => seen.baseline.includes(h))).toEqual([]);
+    await page.getByRole("button", { name: "Finish" }).click();
+    await expect(page.getByRole("heading", { name: "Thank you!" })).toBeVisible();
   });
 
-  test("B: a second desktop participant gets their own random tweets", async ({ page }) => {
-    await startTask(page, "");
-    const run = await labelFiveTweets(page, ["Sadness", "Surprise", "Joy", "Anger", "Fear"]);
-    runs.push(run);
-    const overlap = run.tweets.filter((t) => runs[0].tweets.includes(t)).length;
-    console.log(`Overlap between participants A and B: ${overlap} of 5 tweets`);
-    expect(run.tweets.join("|")).not.toBe(runs[0].tweets.join("|")); // not the identical 5 in the same order
+  test("a code cannot take the same condition twice", async ({ page }) => {
+    await start(page, "baseline", CODE);
+    await expect(page.locator("main [role=alert]")).toContainText("already finished this part");
   });
 
-  test("C: mobile participant (390x844) can complete the whole task", async ({ browser }) => {
-    const context = await browser.newContext({
-      viewport: { width: 390, height: 844 },
-      isMobile: true,
-      hasTouch: true,
-    });
+  test("two wrong check answers end the attempt; the person can start again", async ({ page }) => {
+    await start(page, "baseline", "fox-7");
+    for (let i = 0; i < 2; i++) {
+      await page.getByRole("radio", { name: /The AI says/ }).check();
+      await page.getByRole("button", { name: "Continue" }).click();
+      if (i === 0) await expect(page.locator("main [role=alert]")).toBeVisible();
+    }
+    await expect(page.getByRole("heading", { name: "Please start again" })).toBeVisible();
+    await page.getByRole("button", { name: "Start again" }).click();
+    await start(page, "baseline", "fox-7");
+    await passCheck(page);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(`Headline 1 of ${TOTAL}`);
+  });
+
+  test("phone (390x844): the assisted flow works and fits the screen", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     const page = await context.newPage();
-    await startTask(page, "Phone Tester");
-
-    // No horizontal page scroll on a phone.
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    expect(overflow).toBeLessThanOrEqual(0);
-
-    // Tap "i" to expand a description (touch behaviour).
-    await page.getByRole("button", { name: /Show description of Fear/ }).tap();
-    await expect(page.getByText(/afraid, anxious, worried or threatened/).first()).toBeVisible();
-
-    const run = await labelFiveTweets(page, ["Love", "Love", "Sadness", "Surprise", "Anger"], {
-      shot: `${SHOTS}/participant-task-mobile.png`,
-    });
-    runs.push(run);
-    const overflowDone = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    expect(overflowDone).toBeLessThanOrEqual(0);
+    await start(page, "assisted", "phone-1");
+    await passCheck(page);
+    await answerStep(page, "Satire", 3);
+    await expect(page.locator(".ai-panel")).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/assisted-ai-mobile.png` });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
     await context.close();
   });
 });
 
-test.describe.serial("researcher flow", () => {
-  test("admin area rejects anonymous and wrong-password access", async ({ page, request }) => {
+test.describe.serial("researcher", () => {
+  test("the admin data is refused without a valid login", async ({ page, request }) => {
     expect((await request.get("/api/admin/data")).status()).toBe(401);
     await page.goto("/admin");
-    await page.getByLabel("Password").fill("wrong-password");
+    await page.getByLabel("Password").fill("wrong");
     await page.getByRole("button", { name: "Log in" }).click();
-    await expect(page.locator(".notice--error")).toContainText("Incorrect password");
+    await expect(page.locator("main [role=alert]")).toBeVisible();
   });
 
-  test("admin sees who labeled which tweet with which label, and can export CSV", async ({ page }) => {
+  test("the admin sees every session and downloads both analysis files", async ({ page }) => {
     await page.goto("/admin");
     await page.getByLabel("Password").fill(ADMIN_PASSWORD);
     await page.getByRole("button", { name: "Log in" }).click();
     await expect(page.getByRole("heading", { name: "Collected data" })).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(5); // otter x2, fox stopped + fox again, phone
+    await page.screenshot({ path: `${SHOTS}/admin.png`, fullPage: true });
 
-    // 3 participants x 5 tweets = 15 label rows.
-    await expect(page.locator("table.data tbody tr")).toHaveCount(15);
-    for (const run of runs) {
-      await expect(page.locator("table.data").getByText(run.participantId).first()).toBeVisible();
-    }
-    // Participant A's first tweet and chosen label appear in the table.
-    const firstRow = page.locator("table.data tbody tr", { hasText: runs[0].tweets[0] }).first();
-    await expect(firstRow).toContainText(runs[0].participantId);
-    await expect(firstRow).toContainText("Joy");
-    await expect(firstRow).toContainText("E2E Tester");
+    const trials = await (await page.request.get("/api/admin/data?format=trials")).text();
+    const lines = trials.trim().split("\r\n");
+    expect(lines[0]).toContain("scored_correct");
+    const otter = lines.filter((l) => l.includes(",otter-42,"));
+    expect(otter).toHaveLength(2 * TOTAL);
+    const assisted = otter.filter((l) => l.includes(",assisted,") && !l.includes("catch-1"));
+    expect(assisted.every((l) => /,(Satire|Real),(true|false),\d,\d+,/.test(l))).toBe(true);
 
-    // Filter by participant.
-    await page.getByLabel("Filter by participant").selectOption(runs[1].participantId);
-    await expect(page.locator("table.data tbody tr")).toHaveCount(5);
-    await page.getByLabel("Filter by participant").selectOption("all");
-
-    // The required "data collected" screenshot (wide viewport so every column is visible).
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.screenshot({ path: `${SHOTS}/admin-data.png`, fullPage: true });
-
-    // CSV export.
-    const csv = await page.request.get("/api/admin/data?format=csv");
-    expect(csv.status()).toBe(200);
-    expect(csv.headers()["content-type"]).toContain("text/csv");
-    const text = await csv.text();
-    expect(text.trim().split("\r\n")).toHaveLength(16); // header + 15 rows
-    expect(text).toContain(runs[0].participantId);
-
-    // Sign out returns to the login form.
-    await page.getByRole("button", { name: "Sign out" }).click();
-    await expect(page.getByRole("heading", { name: "Researcher login" })).toBeVisible();
+    const sessions = await (await page.request.get("/api/admin/data?format=sessions")).text();
+    expect(sessions).toContain("I looked for absurd premises.");
+    expect(sessions.trim().split("\r\n")).toHaveLength(1 + 5);
   });
-});
-
-test("every label option is present with a unique keyboard shortcut", async ({ page }) => {
-  await startTask(page, "");
-  for (const name of LABEL_NAMES) {
-    await expect(page.getByRole("radio", { name, exact: true })).toBeVisible();
-  }
 });

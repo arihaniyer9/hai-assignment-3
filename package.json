@@ -1,5 +1,5 @@
 {
-  "name": "emotion-labeling",
+  "name": "satire-study",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,11 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build-dataset": "node scripts/build-dataset.mjs",
     "seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:contract": "SUPABASE_CONTRACT_TEST=1 node --env-file-if-exists=.env.local node_modules/vitest/vitest.mjs run tests/storage-contract.test.ts",
+    "check": "next typegen && tsc --noEmit && eslint . && vitest run"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

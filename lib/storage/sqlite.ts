@@ -1,94 +1,159 @@
 /**
  * lib/storage/sqlite.ts
  *
- * SQLite implementation of {@link Storage}, built on Node's built-in
- * `node:sqlite` module (no native dependency). Used for local development and
- * automated tests only; it is never loaded in production (see `index.ts`)
- * because Vercel's filesystem is ephemeral.
- *
- * The schema mirrors `supabase/schema.sql`. Timestamps are stored as ISO-8601
- * strings.
+ * SQLite implementation of {@link Storage} on Node's built-in `node:sqlite`. Local development and
+ * automated tests only; never loaded in production (Vercel's disk is ephemeral). The schema mirrors
+ * supabase/schema.sql, including the partial unique index that allows one open session per code
+ * and condition.
  */
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { Emotion, LabelKey } from "../emotions";
-import type {
-  AdminRow,
-  DebriefItem,
-  LabelInput,
-  ParticipantCounts,
-  ParticipantState,
-  TweetSeed,
-} from "../types";
-import type { Storage } from "./types";
+import type { Answer, Condition } from "../constants";
+import type { AiOutput, ItemSeed, SessionRecord, TrialRecord } from "../types";
+import type { SessionPatch, Storage, TrialPatch } from "./types";
 
-/** DDL executed on every start (all statements are idempotent). */
 const SCHEMA = `
   PRAGMA foreign_keys = ON;
-  CREATE TABLE IF NOT EXISTS tweets (
+  CREATE TABLE IF NOT EXISTS items (
     id TEXT PRIMARY KEY,
-    text TEXT NOT NULL,
-    ground_truth TEXT NOT NULL
+    headline TEXT NOT NULL,
+    label TEXT NOT NULL CHECK (label IN ('Satire','Real')),
+    type TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    source TEXT NOT NULL
   );
-  CREATE TABLE IF NOT EXISTS participants (
+  CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
-    nickname TEXT,
+    code TEXT NOT NULL,
+    condition TEXT NOT NULL CHECK (condition IN ('baseline','assisted')),
     consented_at TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    completed_at TEXT
+    check_failures INTEGER NOT NULL DEFAULT 0,
+    check_passed_at TEXT,
+    terminated_at TEXT,
+    completed_at TEXT,
+    comment TEXT
   );
-  CREATE TABLE IF NOT EXISTS assignments (
-    participant_id TEXT NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
-    tweet_id TEXT NOT NULL REFERENCES tweets(id),
-    position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 5),
-    PRIMARY KEY (participant_id, tweet_id),
-    UNIQUE (participant_id, position)
-  );
-  CREATE TABLE IF NOT EXISTS labels (
-    participant_id TEXT NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
-    tweet_id TEXT NOT NULL REFERENCES tweets(id),
-    label TEXT NOT NULL CHECK (label IN
-      ('anger','fear','joy','love','sadness','surprise','unsure')),
-    confidence INTEGER NOT NULL CHECK (confidence BETWEEN 1 AND 5),
-    rationale TEXT,
-    time_spent_ms INTEGER NOT NULL,
-    submitted_at TEXT NOT NULL,
-    PRIMARY KEY (participant_id, tweet_id)
+  CREATE UNIQUE INDEX IF NOT EXISTS sessions_open_code
+    ON sessions (code, condition) WHERE terminated_at IS NULL;
+  CREATE TABLE IF NOT EXISTS trials (
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL REFERENCES items(id),
+    position INTEGER NOT NULL CHECK (position >= 1),
+    initial_answer TEXT CHECK (initial_answer IN ('Satire','Real')),
+    initial_confidence INTEGER CHECK (initial_confidence BETWEEN 1 AND 5),
+    initial_time_ms INTEGER CHECK (initial_time_ms >= 0),
+    initial_at TEXT,
+    ai_json TEXT,
+    ai_shown_at TEXT,
+    final_answer TEXT CHECK (final_answer IN ('Satire','Real')),
+    final_confidence INTEGER CHECK (final_confidence BETWEEN 1 AND 5),
+    final_time_ms INTEGER CHECK (final_time_ms >= 0),
+    final_at TEXT,
+    PRIMARY KEY (session_id, item_id),
+    UNIQUE (session_id, position)
   );
 `;
 
-/** Row shape returned by the admin join query. */
-interface AdminJoinRow {
-  participant_id: string;
-  nickname: string | null;
+interface SessionRow {
+  id: string;
+  code: string;
+  condition: Condition;
+  consented_at: string;
+  check_failures: number;
+  check_passed_at: string | null;
+  terminated_at: string | null;
   completed_at: string | null;
-  position: number;
-  tweet_id: string;
-  text: string;
-  label: LabelKey;
-  ground_truth: Emotion;
-  confidence: number;
-  rationale: string | null;
-  time_spent_ms: number;
-  submitted_at: string;
+  comment: string | null;
 }
+
+interface TrialRow {
+  session_id: string;
+  item_id: string;
+  position: number;
+  headline: string;
+  label: Answer;
+  type: string;
+  initial_answer: Answer | null;
+  initial_confidence: number | null;
+  initial_time_ms: number | null;
+  initial_at: string | null;
+  ai_json: string | null;
+  ai_shown_at: string | null;
+  final_answer: Answer | null;
+  final_confidence: number | null;
+  final_time_ms: number | null;
+  final_at: string | null;
+}
+
+const toSession = (r: SessionRow): SessionRecord => ({
+  id: r.id,
+  code: r.code,
+  condition: r.condition,
+  consentedAt: r.consented_at,
+  checkFailures: r.check_failures,
+  checkPassedAt: r.check_passed_at,
+  terminatedAt: r.terminated_at,
+  completedAt: r.completed_at,
+  comment: r.comment,
+});
+
+const toTrial = (r: TrialRow): TrialRecord => ({
+  sessionId: r.session_id,
+  itemId: r.item_id,
+  position: r.position,
+  headline: r.headline,
+  label: r.label,
+  type: r.type,
+  initialAnswer: r.initial_answer,
+  initialConfidence: r.initial_confidence,
+  initialTimeMs: r.initial_time_ms,
+  initialAt: r.initial_at,
+  ai: r.ai_json ? (JSON.parse(r.ai_json) as AiOutput) : null,
+  aiShownAt: r.ai_shown_at,
+  finalAnswer: r.final_answer,
+  finalConfidence: r.final_confidence,
+  finalTimeMs: r.final_time_ms,
+  finalAt: r.final_at,
+});
+
+/** Column names for each patchable field (the only identifiers ever interpolated into SQL). */
+const SESSION_COLUMNS: Record<keyof SessionPatch, string> = {
+  checkFailures: "check_failures",
+  checkPassedAt: "check_passed_at",
+  terminatedAt: "terminated_at",
+  completedAt: "completed_at",
+  comment: "comment",
+};
+const TRIAL_COLUMNS: Record<keyof TrialPatch, string> = {
+  initialAnswer: "initial_answer",
+  initialConfidence: "initial_confidence",
+  initialTimeMs: "initial_time_ms",
+  initialAt: "initial_at",
+  ai: "ai_json",
+  aiShownAt: "ai_shown_at",
+  finalAnswer: "final_answer",
+  finalConfidence: "final_confidence",
+  finalTimeMs: "final_time_ms",
+  finalAt: "final_at",
+};
+
+const TRIAL_SELECT = `
+  SELECT t.session_id, t.item_id, t.position, i.headline, i.label, i.type,
+         t.initial_answer, t.initial_confidence, t.initial_time_ms, t.initial_at,
+         t.ai_json, t.ai_shown_at, t.final_answer, t.final_confidence, t.final_time_ms, t.final_at
+  FROM trials t JOIN items i ON i.id = t.item_id`;
 
 /**
  * Opens (creating if needed) a SQLite database and returns a Storage backed by it.
  *
- * @param file Path of the database file, or ":memory:" for a throwaway DB.
- * @returns A ready-to-use {@link Storage}.
+ * @param file Path of the database file, or ":memory:" for a throwaway database.
  */
 export function createSqliteStorage(file: string): Storage {
   if (file !== ":memory:") mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec(SCHEMA);
 
-  /**
-   * Runs `fn` inside a transaction, rolling back if it throws.
-   * @param fn Work to perform atomically.
-   */
   function transaction(fn: () => void): void {
     db.exec("BEGIN");
     try {
@@ -100,197 +165,105 @@ export function createSqliteStorage(file: string): Storage {
     }
   }
 
+  function update(table: string, columns: Record<string, string>, patch: object, where: string, keys: string[]) {
+    const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
+    if (entries.length === 0) return;
+    const sets = entries.map(([k]) => `${columns[k]} = ?`).join(", ");
+    const values = entries.map(([k, v]) => (k === "ai" ? JSON.stringify(v) : v));
+    db.prepare(`UPDATE ${table} SET ${sets} WHERE ${where}`).run(...values, ...keys);
+  }
+
   return {
-    /** Inserts or updates the whole tweet pool (idempotent, keyed by tweet id). */
-    async seedTweets(tweets) {
+    async seedItems(items) {
       const stmt = db.prepare(
-        `INSERT INTO tweets (id, text, ground_truth) VALUES (?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET text = excluded.text, ground_truth = excluded.ground_truth`,
+        `INSERT INTO items (id, headline, label, type, topic, source) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET headline = excluded.headline, label = excluded.label,
+           type = excluded.type, topic = excluded.topic, source = excluded.source`,
       );
       transaction(() => {
-        for (const t of tweets) stmt.run(t.id, t.text, t.groundTruth);
+        for (const i of items) stmt.run(i.id, i.headline, i.label, i.type, i.topic, i.source);
       });
     },
 
-    /** Returns every tweet in the pool including ground truth (server-side use only). */
-    async listTweets() {
-      const rows = db.prepare("SELECT id, text, ground_truth FROM tweets ORDER BY id").all() as {
-        id: string;
-        text: string;
-        ground_truth: Emotion;
-      }[];
-      return rows.map((r): TweetSeed => ({ id: r.id, text: r.text, groundTruth: r.ground_truth }));
+    async listItems() {
+      return db
+        .prepare("SELECT id, headline, label, type, topic, source FROM items ORDER BY id")
+        .all() as unknown as ItemSeed[];
     },
 
-    /** Inserts a participant row; returns false if the ID is already taken so the caller can retry. */
-    async createParticipant({ id, nickname, consentedAt }) {
+    async createSession({ id, code, condition, consentedAt }) {
       try {
         db.prepare(
-          "INSERT INTO participants (id, nickname, consented_at, created_at) VALUES (?, ?, ?, ?)",
-        ).run(id, nickname, consentedAt, consentedAt);
-        return true;
+          "INSERT INTO sessions (id, code, condition, consented_at) VALUES (?, ?, ?, ?)",
+        ).run(id, code, condition, consentedAt);
+        return "ok";
       } catch (err) {
-        if (err instanceof Error && /UNIQUE constraint/i.test(err.message)) return false;
+        const message = err instanceof Error ? err.message : "";
+        if (/UNIQUE constraint failed: sessions\.id/i.test(message)) return "id_taken";
+        if (/UNIQUE constraint failed: sessions\.code/i.test(message)) return "code_taken";
         throw err;
       }
     },
 
-    /** Deletes a participant; assignments and labels are removed by ON DELETE CASCADE. */
-    async deleteParticipant(id) {
-      db.prepare("DELETE FROM participants WHERE id = ?").run(id);
+    async getSession(id) {
+      const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as SessionRow | undefined;
+      return row ? toSession(row) : null;
     },
 
-    /** Stores the participant's 5 tweets, using each tweet's index + 1 as its position. */
-    async createAssignments(participantId, tweetIds) {
-      const stmt = db.prepare(
-        "INSERT INTO assignments (participant_id, tweet_id, position) VALUES (?, ?, ?)",
-      );
-      transaction(() => {
-        tweetIds.forEach((tweetId, i) => stmt.run(participantId, tweetId, i + 1));
-      });
-    },
-
-    /** Loads a participant's resumable state (tweets + saved labels, no ground truth), or null if unknown. */
-    async getParticipantState(id) {
-      const p = db
-        .prepare("SELECT id, nickname, completed_at FROM participants WHERE id = ?")
-        .get(id) as { id: string; nickname: string | null; completed_at: string | null } | undefined;
-      if (!p) return null;
-      const tweets = db
-        .prepare(
-          `SELECT a.tweet_id AS id, t.text, a.position
-           FROM assignments a JOIN tweets t ON t.id = a.tweet_id
-           WHERE a.participant_id = ? ORDER BY a.position`,
-        )
-        .all(id) as { id: string; text: string; position: number }[];
-      const labels = db
-        .prepare(
-          `SELECT tweet_id, label, confidence, rationale, time_spent_ms, submitted_at
-           FROM labels WHERE participant_id = ?`,
-        )
-        .all(id) as {
-        tweet_id: string;
-        label: LabelKey;
-        confidence: number;
-        rationale: string | null;
-        time_spent_ms: number;
-        submitted_at: string;
-      }[];
-      const state: ParticipantState = {
-        participantId: p.id,
-        nickname: p.nickname,
-        completed: p.completed_at !== null,
-        tweets: tweets.map((t) => ({ id: t.id, text: t.text, position: t.position })),
-        labels: labels.map((l) => ({
-          tweetId: l.tweet_id,
-          label: l.label,
-          confidence: l.confidence,
-          rationale: l.rationale,
-          timeSpentMs: l.time_spent_ms,
-          submittedAt: l.submitted_at,
-        })),
-      };
-      return state;
-    },
-
-    /** Inserts the participant's label for a tweet, or replaces it if one already exists. */
-    async upsertLabel(participantId, tweetId, input: LabelInput, submittedAt) {
-      db.prepare(
-        `INSERT INTO labels
-           (participant_id, tweet_id, label, confidence, rationale, time_spent_ms, submitted_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(participant_id, tweet_id) DO UPDATE SET
-           label = excluded.label, confidence = excluded.confidence,
-           rationale = excluded.rationale, time_spent_ms = excluded.time_spent_ms,
-           submitted_at = excluded.submitted_at`,
-      ).run(
-        participantId,
-        tweetId,
-        input.label,
-        input.confidence,
-        input.rationale,
-        input.timeSpentMs,
-        submittedAt,
-      );
-    },
-
-    /** Marks the participant as submitted by setting completed_at. */
-    async completeParticipant(id, completedAt) {
-      db.prepare("UPDATE participants SET completed_at = ? WHERE id = ?").run(completedAt, id);
-    },
-
-    /** Joins the participant's labels with tweet text and ground truth, ordered by position. */
-    async getParticipantResults(id) {
-      const rows = db
-        .prepare(
-          `SELECT a.position, a.tweet_id, t.text, t.ground_truth, l.label, l.confidence
-           FROM assignments a
-           JOIN tweets t ON t.id = a.tweet_id
-           JOIN labels l ON l.participant_id = a.participant_id AND l.tweet_id = a.tweet_id
-           WHERE a.participant_id = ? ORDER BY a.position`,
-        )
-        .all(id) as {
-        position: number;
-        tweet_id: string;
-        text: string;
-        ground_truth: Emotion;
-        label: LabelKey;
-        confidence: number;
-      }[];
-      return rows.map(
-        (r): DebriefItem => ({
-          position: r.position,
-          tweetId: r.tweet_id,
-          text: r.text,
-          yourLabel: r.label,
-          confidence: r.confidence,
-          groundTruth: r.ground_truth,
-        }),
-      );
-    },
-
-    /** Returns every label joined with participant and tweet data (admin table and CSV), oldest first. */
-    async listAllLabelRows() {
-      const rows = db
-        .prepare(
-          `SELECT l.participant_id, p.nickname, p.completed_at, a.position, l.tweet_id,
-                  t.text, l.label, t.ground_truth, l.confidence, l.rationale,
-                  l.time_spent_ms, l.submitted_at
-           FROM labels l
-           JOIN participants p ON p.id = l.participant_id
-           JOIN tweets t ON t.id = l.tweet_id
-           JOIN assignments a ON a.participant_id = l.participant_id AND a.tweet_id = l.tweet_id
-           ORDER BY l.submitted_at, l.participant_id, a.position`,
-        )
-        .all() as unknown as AdminJoinRow[];
-      return rows.map(
-        (r): AdminRow => ({
-          participantId: r.participant_id,
-          nickname: r.nickname,
-          participantCompleted: r.completed_at !== null,
-          position: r.position,
-          tweetId: r.tweet_id,
-          tweetText: r.text,
-          label: r.label,
-          groundTruth: r.ground_truth,
-          matchesGroundTruth: r.label === r.ground_truth,
-          confidence: r.confidence,
-          rationale: r.rationale,
-          timeSpentMs: r.time_spent_ms,
-          submittedAt: r.submitted_at,
-        }),
-      );
-    },
-
-    /** Counts participants who started and who completed the task. */
-    async getParticipantCounts() {
+    async findOpenSession(code, condition) {
       const row = db
         .prepare(
-          "SELECT COUNT(*) AS started, COUNT(completed_at) AS completed FROM participants",
+          "SELECT * FROM sessions WHERE code = ? AND condition = ? AND terminated_at IS NULL",
         )
-        .get() as { started: number; completed: number };
-      const counts: ParticipantCounts = { started: row.started, completed: row.completed };
-      return counts;
+        .get(code, condition) as SessionRow | undefined;
+      return row ? toSession(row) : null;
+    },
+
+    async updateSession(id, patch) {
+      update("sessions", SESSION_COLUMNS, patch, "id = ?", [id]);
+    },
+
+    async seenItemIds(code) {
+      const rows = db
+        .prepare(
+          `SELECT DISTINCT t.item_id FROM trials t JOIN sessions s ON s.id = t.session_id
+           WHERE s.code = ?`,
+        )
+        .all(code) as { item_id: string }[];
+      return new Set(rows.map((r) => r.item_id));
+    },
+
+    async createTrials(sessionId, itemIds) {
+      const stmt = db.prepare("INSERT INTO trials (session_id, item_id, position) VALUES (?, ?, ?)");
+      transaction(() => itemIds.forEach((itemId, i) => stmt.run(sessionId, itemId, i + 1)));
+    },
+
+    async listTrials(sessionId) {
+      const rows = db
+        .prepare(`${TRIAL_SELECT} WHERE t.session_id = ? ORDER BY t.position`)
+        .all(sessionId) as unknown as TrialRow[];
+      return rows.map(toTrial);
+    },
+
+    async updateTrial(sessionId, itemId, patch) {
+      update("trials", TRIAL_COLUMNS, patch, "session_id = ? AND item_id = ?", [sessionId, itemId]);
+    },
+
+    async listAllSessions() {
+      const rows = db
+        .prepare("SELECT * FROM sessions ORDER BY consented_at, id")
+        .all() as unknown as SessionRow[];
+      return rows.map(toSession);
+    },
+
+    async listAllTrials() {
+      const rows = db
+        .prepare(
+          `${TRIAL_SELECT} JOIN sessions s ON s.id = t.session_id
+           ORDER BY s.consented_at, t.session_id, t.position`,
+        )
+        .all() as unknown as TrialRow[];
+      return rows.map(toTrial);
     },
   };
 }

@@ -1,36 +1,44 @@
 /**
  * lib/service.ts
  *
- * The application's business rules, independent of HTTP and of the database
- * back end. API routes call these functions; these functions call `Storage`.
+ * The study's rules, independent of HTTP and of the database. API routes call these functions;
+ * these functions call `Storage`.
  *
  * Rules enforced here:
- *   - each participant gets 5 distinct tweets drawn uniformly at random;
- *   - a participant may only label tweets assigned to them;
- *   - labels can be edited until the participant submits, and never after;
- *   - submission requires all 5 tweets to be labeled;
- *   - ground truth is only returned by {@link getResults}/{@link completeParticipant},
- *     i.e. after the participant has submitted.
+ *   - one open session per participant code and condition; returning with the same code resumes it;
+ *   - the instruction check comes first; failing it MAX_CHECK_FAILURES times ends the session, and
+ *     the person may start over with the same code;
+ *   - trials are drawn only after the check is passed: TRIALS_PER_TYPE of each type, none the code
+ *     has already seen in the other condition, plus one attention check;
+ *   - trials are answered strictly in order;
+ *   - in the assisted condition the AI is shown only after the participant's own answer is saved,
+ *     and that answer can never change afterwards; the final answer needs the AI to have been shown;
+ *   - every answer is write-once (a retry with the same values is accepted, a different one is not);
+ *   - the AI output is computed live, logged once, and the same logged output is returned on reload;
+ *   - ground truth never leaves the server before completion, and then only as a score.
  */
-import { TWEETS_PER_PARTICIPANT } from "./constants";
-import { generateParticipantId } from "./ids";
-import { sampleTweets } from "./sampling";
+import { aiFor } from "./ai";
+import { CATCH_ITEM_ID, MAX_CHECK_FAILURES, type Answer, type Condition } from "./constants";
+import { scoredAnswer } from "./export";
+import { generateSessionId } from "./ids";
+import { CHECK_ANSWER } from "./instructions";
+import { drawSession } from "./sampling";
 import { getStorage } from "./storage";
 import type { Storage } from "./storage/types";
-import type { DebriefItem, ParticipantState, TweetPublic } from "./types";
-import type { CreateParticipantInput, LabelSubmitInput } from "./validation";
+import type {
+  AiOutput,
+  DebriefSummary,
+  SessionRecord,
+  SessionState,
+  SessionStatus,
+  TrialPublic,
+  TrialRecord,
+} from "./types";
 
-export { TWEETS_PER_PARTICIPANT };
-
-/** Machine-readable failure categories the API layer maps to HTTP statuses. */
 export type ServiceErrorCode = "not_found" | "forbidden" | "conflict" | "invalid" | "unavailable";
 
-/** An expected, user-facing failure (as opposed to a bug or outage). */
+/** An expected, participant-facing failure (as opposed to a bug or outage). */
 export class ServiceError extends Error {
-  /**
-   * @param code Failure category.
-   * @param message Short explanation safe to show to the participant.
-   */
   constructor(
     public readonly code: ServiceErrorCode,
     message: string,
@@ -40,148 +48,249 @@ export class ServiceError extends Error {
   }
 }
 
-/**
- * Loads a participant's state or throws `not_found`.
- *
- * @param storage The storage to read from.
- * @param id Participant ID.
- * @returns The participant's state.
- */
-async function requireState(storage: Storage, id: string): Promise<ParticipantState> {
-  const state = await storage.getParticipantState(id);
-  if (!state) throw new ServiceError("not_found", "Participant not found.");
-  return state;
+export interface StartInput {
+  condition: Condition;
+  code: string;
 }
 
-/**
- * Registers a new participant (after consent) and draws their 5 random tweets.
- *
- * @param input Validated request body (nickname optional, consent must be true).
- * @param storage Storage to use (defaults to the environment's storage).
- * @returns The new participant ID and their tweets, WITHOUT ground truth.
- * @throws ServiceError `unavailable` when the tweet pool has not been seeded.
- */
-export async function startParticipant(
-  input: CreateParticipantInput,
-  storage?: Storage,
-): Promise<{ participantId: string; tweets: TweetPublic[] }> {
-  const store = storage ?? (await getStorage());
-  const pool = await store.listTweets();
-  if (pool.length < TWEETS_PER_PARTICIPANT) {
-    throw new ServiceError("unavailable", "The task is not set up yet. Please try again later.");
-  }
+export interface AnswerInput {
+  itemId: string;
+  answer: Answer;
+  confidence: number;
+  timeMs: number;
+}
 
-  // IDs are random; on the (very unlikely) collision simply draw another one.
-  let participantId = "";
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const candidate = generateParticipantId();
-    const created = await store.createParticipant({
-      id: candidate,
-      nickname: input.nickname ?? null,
-      consentedAt: new Date().toISOString(),
-    });
-    if (created) {
-      participantId = candidate;
-      break;
-    }
-  }
-  if (!participantId) throw new ServiceError("unavailable", "Could not create a participant ID.");
+const now = () => new Date().toISOString();
 
-  const drawn = sampleTweets(pool, TWEETS_PER_PARTICIPANT);
-  try {
-    await store.createAssignments(
-      participantId,
-      drawn.map((t) => t.id),
-    );
-  } catch (err) {
-    await store.deleteParticipant(participantId); // do not leave an orphan participant
-    throw err;
-  }
+function statusOf(s: SessionRecord): SessionStatus {
+  if (s.terminatedAt) return "terminated";
+  if (s.completedAt) return "done";
+  if (!s.checkPassedAt) return "check";
+  return "trials";
+}
+
+const isCatch = (t: TrialRecord) => t.itemId === CATCH_ITEM_ID;
+
+/** Whether a trial needs a final (post-AI) answer: assisted study trials only. */
+const needsFinal = (s: SessionRecord, t: TrialRecord) => s.condition === "assisted" && !isCatch(t);
+
+/** Whether the participant has finished this trial. */
+function trialDone(s: SessionRecord, t: TrialRecord): boolean {
+  return needsFinal(s, t) ? t.finalAnswer !== null : t.initialAnswer !== null;
+}
+
+function toPublic(t: TrialRecord): TrialPublic {
   return {
-    participantId,
-    tweets: drawn.map((t, i) => ({ id: t.id, text: t.text, position: i + 1 })),
+    position: t.position,
+    itemId: t.itemId,
+    headline: t.headline,
+    isCatch: isCatch(t),
+    initialAnswer: t.initialAnswer,
+    initialConfidence: t.initialConfidence,
+    ai: t.ai,
+    finalAnswer: t.finalAnswer,
+    finalConfidence: t.finalConfidence,
+  };
+}
+
+async function requireSession(store: Storage, id: string): Promise<SessionRecord> {
+  const s = await store.getSession(id);
+  if (!s) throw new ServiceError("not_found", "Session not found.");
+  return s;
+}
+
+async function stateOf(store: Storage, s: SessionRecord): Promise<SessionState> {
+  const trials = statusOf(s) === "check" ? [] : await store.listTrials(s.id);
+  return {
+    sessionId: s.id,
+    code: s.code,
+    condition: s.condition,
+    status: statusOf(s),
+    checkFailures: s.checkFailures,
+    trials: trials.map(toPublic),
   };
 }
 
 /**
- * Returns a participant's resumable state (tweets and saved labels, no ground truth).
+ * Starts a session, or resumes the code's open session in this condition.
  *
- * @param id Participant ID.
- * @param storage Storage to use (defaults to the environment's storage).
- * @throws ServiceError `not_found` for unknown IDs.
+ * @throws ServiceError `conflict` when this code already completed this condition.
  */
-export async function getParticipantState(id: string, storage?: Storage): Promise<ParticipantState> {
-  return requireState(storage ?? (await getStorage()), id);
-}
-
-/**
- * Saves (creates or overwrites) one label for one of the participant's tweets.
- *
- * @param id Participant ID.
- * @param input Validated label payload.
- * @param storage Storage to use (defaults to the environment's storage).
- * @throws ServiceError `not_found`, `conflict` (already submitted) or
- *   `forbidden` (tweet not assigned to this participant).
- */
-export async function saveLabel(
-  id: string,
-  input: LabelSubmitInput,
-  storage?: Storage,
-): Promise<void> {
+export async function startSession(input: StartInput, storage?: Storage): Promise<SessionState> {
   const store = storage ?? (await getStorage());
-  const state = await requireState(store, id);
-  if (state.completed) throw new ServiceError("conflict", "This session has already been submitted.");
-  if (!state.tweets.some((t) => t.id === input.tweetId)) {
-    throw new ServiceError("forbidden", "That tweet is not part of your task.");
-  }
-  await store.upsertLabel(
-    id,
-    input.tweetId,
-    {
-      label: input.label,
-      confidence: input.confidence,
-      rationale: input.rationale,
-      timeSpentMs: input.timeSpentMs,
-    },
-    new Date().toISOString(),
-  );
-}
-
-/**
- * Submits the participant's session. Requires every assigned tweet to be
- * labeled. Idempotent: submitting twice just returns the debrief again.
- *
- * @param id Participant ID.
- * @param storage Storage to use (defaults to the environment's storage).
- * @returns The debrief (now including ground truth).
- * @throws ServiceError `not_found` or `invalid` (some tweets still unlabeled).
- */
-export async function completeParticipant(id: string, storage?: Storage): Promise<DebriefItem[]> {
-  const store = storage ?? (await getStorage());
-  const state = await requireState(store, id);
-  if (!state.completed) {
-    const labeled = new Set(state.labels.map((l) => l.tweetId));
-    if (!state.tweets.every((t) => labeled.has(t.id))) {
-      throw new ServiceError("invalid", "Please label all of your tweets before submitting.");
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const open = await store.findOpenSession(input.code, input.condition);
+    if (open) {
+      if (open.completedAt) {
+        throw new ServiceError(
+          "conflict",
+          "This code has already finished this part. If that wasn't you, please choose a different code.",
+        );
+      }
+      return stateOf(store, open);
     }
-    await store.completeParticipant(id, new Date().toISOString());
+    const id = generateSessionId();
+    const result = await store.createSession({ id, code: input.code, condition: input.condition, consentedAt: now() });
+    if (result === "ok") return stateOf(store, await requireSession(store, id));
+    // "code_taken": another tab created it a moment ago; loop and resume it. "id_taken": draw again.
   }
-  return store.getParticipantResults(id);
+  throw new ServiceError("unavailable", "Could not start a session. Please try again.");
+}
+
+export async function getSessionState(id: string, storage?: Storage): Promise<SessionState> {
+  const store = storage ?? (await getStorage());
+  return stateOf(store, await requireSession(store, id));
 }
 
 /**
- * Returns the debrief (labels vs. ground truth). Only available after submission,
- * so ground truth can never influence the labeling itself.
+ * Checks the answer to the instruction question. A pass draws the trials.
  *
- * @param id Participant ID.
- * @param storage Storage to use (defaults to the environment's storage).
- * @throws ServiceError `not_found`, or `forbidden` when not yet submitted.
+ * @returns Whether the answer was right, and the new state.
+ * @throws ServiceError `conflict` unless the session is waiting for the check.
  */
-export async function getResults(id: string, storage?: Storage): Promise<DebriefItem[]> {
+export async function answerCheck(
+  id: string,
+  answer: string,
+  storage?: Storage,
+): Promise<{ correct: boolean; state: SessionState }> {
   const store = storage ?? (await getStorage());
-  const state = await requireState(store, id);
-  if (!state.completed) {
-    throw new ServiceError("forbidden", "Results are available after you submit.");
+  const s = await requireSession(store, id);
+  if (statusOf(s) !== "check") throw new ServiceError("conflict", "The check is not open for this session.");
+
+  if (answer !== CHECK_ANSWER) {
+    const failures = s.checkFailures + 1;
+    await store.updateSession(id, {
+      checkFailures: failures,
+      ...(failures >= MAX_CHECK_FAILURES ? { terminatedAt: now() } : {}),
+    });
+    return { correct: false, state: await stateOf(store, await requireSession(store, id)) };
   }
-  return store.getParticipantResults(id);
+
+  const [items, seen] = await Promise.all([store.listItems(), store.seenItemIds(s.code)]);
+  let order: string[];
+  try {
+    order = drawSession(items, seen);
+  } catch {
+    throw new ServiceError("unavailable", "The study is not set up yet. Please tell the researcher.");
+  }
+  await store.createTrials(id, order);
+  await store.updateSession(id, { checkPassedAt: now() });
+  return { correct: true, state: await stateOf(store, await requireSession(store, id)) };
+}
+
+/** Loads the session and the trial the participant is answering, enforcing the order. */
+async function requireCurrentTrial(
+  store: Storage,
+  id: string,
+  itemId: string,
+): Promise<{ s: SessionRecord; trial: TrialRecord }> {
+  const s = await requireSession(store, id);
+  if (statusOf(s) !== "trials") throw new ServiceError("conflict", "This session is not taking answers.");
+  const trials = await store.listTrials(id);
+  const trial = trials.find((t) => t.itemId === itemId);
+  if (!trial) throw new ServiceError("forbidden", "That headline is not part of your session.");
+  if (trials.some((t) => t.position < trial.position && !trialDone(s, t))) {
+    throw new ServiceError("invalid", "Please answer the headlines in order.");
+  }
+  return { s, trial };
+}
+
+function sameAnswer(a: Answer | null, c: number | null, input: AnswerInput): boolean {
+  return a === input.answer && c === input.confidence;
+}
+
+/** Saves the participant's own answer (the only answer in the baseline condition). */
+export async function saveInitial(id: string, input: AnswerInput, storage?: Storage): Promise<void> {
+  const store = storage ?? (await getStorage());
+  const { trial } = await requireCurrentTrial(store, id, input.itemId);
+  if (trial.initialAnswer !== null) {
+    if (sameAnswer(trial.initialAnswer, trial.initialConfidence, input)) return; // retry
+    throw new ServiceError("conflict", "This answer has already been saved.");
+  }
+  await store.updateTrial(id, input.itemId, {
+    initialAnswer: input.answer,
+    initialConfidence: input.confidence,
+    initialTimeMs: input.timeMs,
+    initialAt: now(),
+  });
+}
+
+/**
+ * Computes, logs and returns the AI's output for a trial (assisted condition, after the own answer).
+ * Calling it again returns the logged output unchanged.
+ */
+export async function showAi(id: string, itemId: string, storage?: Storage): Promise<AiOutput> {
+  const store = storage ?? (await getStorage());
+  const { s, trial } = await requireCurrentTrial(store, id, itemId);
+  if (!needsFinal(s, trial)) throw new ServiceError("forbidden", "There is no AI suggestion for this item.");
+  if (trial.initialAnswer === null) {
+    throw new ServiceError("invalid", "Please give your own answer before seeing the AI's.");
+  }
+  if (trial.ai) return trial.ai;
+  const ai = aiFor(trial.headline);
+  await store.updateTrial(id, itemId, { ai, aiShownAt: now() });
+  return ai;
+}
+
+/** Saves the answer given after seeing the AI (assisted condition). */
+export async function saveFinal(id: string, input: AnswerInput, storage?: Storage): Promise<void> {
+  const store = storage ?? (await getStorage());
+  const { s, trial } = await requireCurrentTrial(store, id, input.itemId);
+  if (!needsFinal(s, trial)) throw new ServiceError("forbidden", "This item has no second answer.");
+  if (!trial.ai) throw new ServiceError("invalid", "Please look at the AI's suggestion first.");
+  if (trial.finalAnswer !== null) {
+    if (sameAnswer(trial.finalAnswer, trial.finalConfidence, input)) return; // retry
+    throw new ServiceError("conflict", "This answer has already been saved.");
+  }
+  await store.updateTrial(id, input.itemId, {
+    finalAnswer: input.answer,
+    finalConfidence: input.confidence,
+    finalTimeMs: input.timeMs,
+    finalAt: now(),
+  });
+}
+
+function summarise(s: SessionRecord, trials: TrialRecord[]): DebriefSummary {
+  const study = trials.filter((t) => !isCatch(t));
+  return {
+    condition: s.condition,
+    code: s.code,
+    correct: study.filter((t) => scoredAnswer(s.condition, t) === t.label).length,
+    total: study.length,
+  };
+}
+
+/**
+ * Finishes the session (every trial answered) and returns the score. Idempotent.
+ *
+ * @throws ServiceError `invalid` while trials are unanswered, `conflict` for a session in the
+ *   check stage or terminated.
+ */
+export async function completeSession(
+  id: string,
+  comment: string | null,
+  storage?: Storage,
+): Promise<DebriefSummary> {
+  const store = storage ?? (await getStorage());
+  const s = await requireSession(store, id);
+  const status = statusOf(s);
+  if (status === "check" || status === "terminated") {
+    throw new ServiceError("conflict", "This session cannot be completed.");
+  }
+  const trials = await store.listTrials(id);
+  if (status === "trials") {
+    if (!trials.every((t) => trialDone(s, t))) {
+      throw new ServiceError("invalid", "Please answer every headline before finishing.");
+    }
+    await store.updateSession(id, { completedAt: now(), comment });
+  }
+  return summarise(s, trials);
+}
+
+/** The score of a completed session. */
+export async function getSummary(id: string, storage?: Storage): Promise<DebriefSummary> {
+  const store = storage ?? (await getStorage());
+  const s = await requireSession(store, id);
+  if (!s.completedAt) throw new ServiceError("forbidden", "Your score is available when you finish.");
+  return summarise(s, await store.listTrials(id));
 }

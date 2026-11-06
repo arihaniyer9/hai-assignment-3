@@ -1,150 +1,308 @@
 /**
- * tests/service.test.ts — business rules, run against a throwaway in-memory
- * SQLite database through the same Storage interface Supabase implements.
- * Also acts as the storage "contract" test for the SQLite adapter.
+ * tests/service.test.ts — the study rules, against a throwaway in-memory SQLite database through
+ * the same Storage interface Supabase implements.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { loadTweetSeeds } from "../lib/dataset";
+import { aiFor } from "../lib/ai";
+import { CATCH_ITEM_ID, ITEM_TYPES, STUDY_TRIALS, TRIALS_PER_TYPE, type Condition } from "../lib/constants";
+import { CHECK_ANSWER } from "../lib/instructions";
+import { loadItemSeeds } from "../lib/items";
 import {
-  ServiceError,
-  TWEETS_PER_PARTICIPANT,
-  completeParticipant,
-  getParticipantState,
-  getResults,
-  saveLabel,
-  startParticipant,
+  answerCheck,
+  completeSession,
+  getSessionState,
+  getSummary,
+  saveFinal,
+  saveInitial,
+  showAi,
+  startSession,
 } from "../lib/service";
-import { computeAdminStats } from "../lib/stats";
 import { createSqliteStorage } from "../lib/storage/sqlite";
 import type { Storage } from "../lib/storage/types";
-import type { LabelSubmitInput } from "../lib/validation";
+import type { SessionState } from "../lib/types";
+import { failure } from "./helpers";
 
-let storage: Storage;
-
-/** Builds a valid label payload for a tweet, overriding only what a test cares about. */
-const label = (tweetId: string, over: Partial<LabelSubmitInput> = {}): LabelSubmitInput => ({
-  tweetId,
-  label: "joy",
-  confidence: 3,
-  rationale: null,
-  timeSpentMs: 1234,
-  ...over,
-});
-
-/** Runs `fn` and returns the ServiceError it throws (fails if it doesn't). */
-async function failure(fn: () => Promise<unknown>): Promise<ServiceError> {
-  try {
-    await fn();
-  } catch (err) {
-    expect(err).toBeInstanceOf(ServiceError);
-    return err as ServiceError;
-  }
-  throw new Error("expected a ServiceError");
-}
+let store: Storage;
+const items = loadItemSeeds();
+const labelOf = new Map(items.map((i) => [i.id, i.label]));
+const typeOf = new Map(items.map((i) => [i.id, i.type]));
 
 beforeEach(async () => {
-  storage = createSqliteStorage(":memory:");
-  await storage.seedTweets(loadTweetSeeds());
+  store = createSqliteStorage(":memory:");
+  await store.seedItems(items);
 });
 
-describe("dataset", () => {
-  it("has at least 50 tweets covering all six emotions", async () => {
-    const tweets = await storage.listTweets();
-    expect(tweets.length).toBeGreaterThanOrEqual(50);
-    expect(new Set(tweets.map((t) => t.groundTruth)).size).toBe(6);
-  });
-  it("seeding twice does not duplicate tweets", async () => {
-    const before = (await storage.listTweets()).length;
-    await storage.seedTweets(loadTweetSeeds());
-    expect((await storage.listTweets()).length).toBe(before);
-  });
+const ans = (itemId: string, answer: "Satire" | "Real" = "Satire", confidence = 3) => ({
+  itemId,
+  answer,
+  confidence,
+  timeMs: 1000,
 });
 
-describe("startParticipant", () => {
-  it("assigns 5 distinct tweets and never exposes ground truth", async () => {
-    const { participantId, tweets } = await startParticipant({ consent: true }, storage);
-    expect(participantId).toMatch(/^P-/);
-    expect(tweets).toHaveLength(TWEETS_PER_PARTICIPANT);
-    expect(new Set(tweets.map((t) => t.id)).size).toBe(5);
-    expect(tweets.map((t) => t.position)).toEqual([1, 2, 3, 4, 5]);
-    expect(JSON.stringify(tweets)).not.toContain("groundTruth");
-  });
-  it("gives different participants different sets", async () => {
-    const sets = new Set<string>();
-    for (let i = 0; i < 10; i++) {
-      const { tweets } = await startParticipant({ consent: true }, storage);
-      sets.add(tweets.map((t) => t.id).sort().join(","));
+async function started(condition: Condition, code = "blue-otter-7"): Promise<SessionState> {
+  const s = await startSession({ condition, code }, store);
+  return (await answerCheck(s.sessionId, CHECK_ANSWER, store)).state;
+}
+
+/** Answers every trial: `right` decides whether each scored answer matches the truth. */
+async function answerAll(s: SessionState, right: (i: number) => boolean = () => true) {
+  for (const [i, t] of s.trials.entries()) {
+    const truth = labelOf.get(t.itemId)!;
+    const other = truth === "Satire" ? "Real" : "Satire";
+    const pick = right(i) ? truth : other;
+    if (s.condition === "assisted" && !t.isCatch) {
+      await saveInitial(s.sessionId, ans(t.itemId, other), store);
+      await showAi(s.sessionId, t.itemId, store);
+      await saveFinal(s.sessionId, ans(t.itemId, pick), store);
+    } else {
+      await saveInitial(s.sessionId, ans(t.itemId, pick), store);
     }
-    expect(sets.size).toBeGreaterThan(5);
+  }
+}
+
+describe("starting and resuming", () => {
+  it("a new session waits for the instruction check and has no trials yet", async () => {
+    const s = await startSession({ condition: "baseline", code: "blue-otter-7" }, store);
+    expect(s.status).toBe("check");
+    expect(s.trials).toEqual([]);
+    expect(s.sessionId).toMatch(/^S-/);
   });
-  it("stores the optional nickname", async () => {
-    const { participantId } = await startParticipant({ consent: true, nickname: "Sam" }, storage);
-    expect((await getParticipantState(participantId, storage)).nickname).toBe("Sam");
+
+  it("the same code and condition resumes the same session", async () => {
+    const a = await startSession({ condition: "baseline", code: "blue-otter-7" }, store);
+    const b = await startSession({ condition: "baseline", code: "blue-otter-7" }, store);
+    expect(b.sessionId).toBe(a.sessionId);
   });
-  it("reports unavailable when the pool is empty", async () => {
-    const empty = createSqliteStorage(":memory:");
-    expect((await failure(() => startParticipant({ consent: true }, empty))).code).toBe("unavailable");
+
+  it("the other condition, or another code, gets a new session (positive twins)", async () => {
+    const a = await startSession({ condition: "baseline", code: "blue-otter-7" }, store);
+    const b = await startSession({ condition: "assisted", code: "blue-otter-7" }, store);
+    const c = await startSession({ condition: "baseline", code: "red-fox-2" }, store);
+    expect(new Set([a.sessionId, b.sessionId, c.sessionId]).size).toBe(3);
+  });
+
+  it("a code that finished a condition cannot take it again", async () => {
+    const s = await started("baseline");
+    await answerAll(s);
+    await completeSession(s.sessionId, null, store);
+    const err = await failure(() => startSession({ condition: "baseline", code: "blue-otter-7" }, store));
+    expect(err.code).toBe("conflict");
+  });
+
+  it("unknown sessions are not found", async () => {
+    expect((await failure(() => getSessionState("S-AAAAAA", store))).code).toBe("not_found");
+  });
+
+  it("the database refuses a second open session for a code, even if the service is bypassed", async () => {
+    await store.createSession({ id: "S-AAAAAA", code: "x-y-z", condition: "baseline", consentedAt: "t" });
+    const again = await store.createSession({ id: "S-BBBBBB", code: "x-y-z", condition: "baseline", consentedAt: "t" });
+    expect(again).toBe("code_taken");
+    const sameId = await store.createSession({ id: "S-AAAAAA", code: "other", condition: "baseline", consentedAt: "t" });
+    expect(sameId).toBe("id_taken");
   });
 });
 
-describe("saveLabel", () => {
-  it("records who labeled which tweet with which label, and upserts on re-save", async () => {
-    const { participantId, tweets } = await startParticipant({ consent: true }, storage);
-    await saveLabel(participantId, label(tweets[0].id, { label: "anger", confidence: 5 }), storage);
-    await saveLabel(participantId, label(tweets[0].id, { label: "fear", confidence: 2, rationale: "ok" }), storage);
-    const state = await getParticipantState(participantId, storage);
-    expect(state.labels).toHaveLength(1);
-    expect(state.labels[0]).toMatchObject({ tweetId: tweets[0].id, label: "fear", confidence: 2, rationale: "ok" });
-    expect(JSON.stringify(state)).not.toContain("groundTruth");
+describe("instruction check", () => {
+  it("a right answer draws 20 study trials, 5 per type, plus the attention check", async () => {
+    const s = await started("baseline");
+    expect(s.status).toBe("trials");
+    expect(s.trials).toHaveLength(STUDY_TRIALS + 1);
+    for (const type of ITEM_TYPES) {
+      expect(s.trials.filter((t) => typeOf.get(t.itemId) === type)).toHaveLength(TRIALS_PER_TYPE);
+    }
+    expect(s.trials.filter((t) => t.isCatch).map((t) => t.itemId)).toEqual([CATCH_ITEM_ID]);
   });
-  it("rejects tweets not assigned to the participant", async () => {
-    const { participantId, tweets } = await startParticipant({ consent: true }, storage);
-    const assigned = new Set(tweets.map((t) => t.id));
-    const other = (await storage.listTweets()).find((t) => !assigned.has(t.id))!;
-    expect((await failure(() => saveLabel(participantId, label(other.id), storage))).code).toBe("forbidden");
+
+  it("one wrong answer allows a retry; a second ends the session", async () => {
+    const s = await startSession({ condition: "baseline", code: "blue-otter-7" }, store);
+    const first = await answerCheck(s.sessionId, "funny", store);
+    expect(first.correct).toBe(false);
+    expect(first.state.status).toBe("check");
+    expect(first.state.checkFailures).toBe(1);
+    const second = await answerCheck(s.sessionId, "ai", store);
+    expect(second.state.status).toBe("terminated");
+    expect(second.state.trials).toEqual([]);
   });
-  it("rejects unknown participants", async () => {
-    expect((await failure(() => saveLabel("P-AAAAAA", label("t001"), storage))).code).toBe("not_found");
+
+  it("after being stopped the person can start over with the same code", async () => {
+    const s = await startSession({ condition: "baseline", code: "blue-otter-7" }, store);
+    await answerCheck(s.sessionId, "funny", store);
+    await answerCheck(s.sessionId, "funny", store);
+    const again = await startSession({ condition: "baseline", code: "blue-otter-7" }, store);
+    expect(again.sessionId).not.toBe(s.sessionId);
+    expect(again.status).toBe("check");
+    expect((await answerCheck(again.sessionId, CHECK_ANSWER, store)).correct).toBe(true);
+  });
+
+  it("the check cannot be taken again once passed", async () => {
+    const s = await started("baseline");
+    expect((await failure(() => answerCheck(s.sessionId, CHECK_ANSWER, store))).code).toBe("conflict");
+  });
+
+  it("a code's second condition never repeats a headline from its first", async () => {
+    for (let i = 0; i < 10; i++) {
+      const code = `person-${i}`;
+      const a = await started("baseline", code);
+      const b = await started("assisted", code);
+      const study = (s: SessionState) => s.trials.filter((t) => !t.isCatch).map((t) => t.itemId);
+      expect(study(b).filter((id) => study(a).includes(id))).toEqual([]);
+    }
   });
 });
 
-describe("completeParticipant / getResults", () => {
-  it("requires all 5 tweets to be labeled", async () => {
-    const { participantId, tweets } = await startParticipant({ consent: true }, storage);
-    for (const t of tweets.slice(0, 4)) await saveLabel(participantId, label(t.id), storage);
-    expect((await failure(() => completeParticipant(participantId, storage))).code).toBe("invalid");
+describe("baseline trials", () => {
+  it("are answered in order, once each", async () => {
+    const s = await started("baseline");
+    const [t1, t2] = s.trials;
+    expect((await failure(() => saveInitial(s.sessionId, ans(t2.itemId), store))).code).toBe("invalid");
+    await saveInitial(s.sessionId, ans(t1.itemId, "Real", 4), store);
+    await saveInitial(s.sessionId, ans(t1.itemId, "Real", 4), store); // a retry is fine
+    const changed = await failure(() => saveInitial(s.sessionId, ans(t1.itemId, "Satire", 4), store));
+    expect(changed.code).toBe("conflict");
+    await saveInitial(s.sessionId, ans(t2.itemId), store); // now in order
+    const state = await getSessionState(s.sessionId, store);
+    expect(state.trials[0]).toMatchObject({ initialAnswer: "Real", initialConfidence: 4 });
   });
-  it("hides results until completion, then reveals ground truth and locks editing", async () => {
-    const { participantId, tweets } = await startParticipant({ consent: true }, storage);
-    expect((await failure(() => getResults(participantId, storage))).code).toBe("forbidden");
-    for (const t of tweets) await saveLabel(participantId, label(t.id), storage);
-    const items = await completeParticipant(participantId, storage);
-    expect(items).toHaveLength(5);
-    for (const item of items) expect(item.groundTruth).toBeTruthy();
-    expect(await getResults(participantId, storage)).toEqual(items);
-    expect((await getParticipantState(participantId, storage)).completed).toBe(true);
-    expect((await failure(() => saveLabel(participantId, label(tweets[0].id), storage))).code).toBe("conflict");
-    expect(await completeParticipant(participantId, storage)).toEqual(items); // idempotent
+
+  it("refuse items outside the session", async () => {
+    const s = await started("baseline");
+    const foreign = items.find((i) => !s.trials.some((t) => t.itemId === i.id))!;
+    expect((await failure(() => saveInitial(s.sessionId, ans(foreign.id), store))).code).toBe("forbidden");
+  });
+
+  it("have no AI and no second answer", async () => {
+    const s = await started("baseline");
+    const t = s.trials[0];
+    await saveInitial(s.sessionId, ans(t.itemId), store);
+    expect((await failure(() => showAi(s.sessionId, t.itemId, store))).code).toBe("forbidden");
+    expect((await failure(() => saveFinal(s.sessionId, ans(t.itemId), store))).code).toBe("forbidden");
+  });
+
+  it("refuse answers before the check is passed", async () => {
+    const s = await startSession({ condition: "baseline", code: "blue-otter-7" }, store);
+    expect((await failure(() => saveInitial(s.sessionId, ans("h1"), store))).code).toBe("conflict");
   });
 });
 
-describe("admin data", () => {
-  it("joins labels with participant, tweet and ground truth and counts participants", async () => {
-    const a = await startParticipant({ consent: true, nickname: "Ada" }, storage);
-    const b = await startParticipant({ consent: true }, storage);
-    for (const t of a.tweets) await saveLabel(a.participantId, label(t.id), storage);
-    await completeParticipant(a.participantId, storage);
-    await saveLabel(b.participantId, label(b.tweets[0].id, { label: "unsure" }), storage);
+describe("assisted trials", () => {
+  it("show the AI only after the participant's own answer", async () => {
+    const s = await started("assisted");
+    const t = s.trials[0]; // position 1 is never the attention check (CATCH_EARLIEST > 1)
+    expect(t.isCatch).toBe(false);
+    expect((await failure(() => showAi(s.sessionId, t.itemId, store))).code).toBe("invalid");
+    await saveInitial(s.sessionId, ans(t.itemId), store);
+    const ai = await showAi(s.sessionId, t.itemId, store);
+    expect(ai).toEqual(aiFor(t.headline));
+  });
 
-    const rows = await storage.listAllLabelRows();
-    expect(rows).toHaveLength(6);
-    const adaRows = rows.filter((r) => r.participantId === a.participantId);
-    expect(adaRows.every((r) => r.nickname === "Ada" && r.participantCompleted)).toBe(true);
-    expect(adaRows.map((r) => r.position).sort()).toEqual([1, 2, 3, 4, 5]);
-    for (const r of rows) expect(r.matchesGroundTruth).toBe(r.label === r.groundTruth);
+  it("log the AI output once and return the logged output on reload", async () => {
+    const s = await started("assisted");
+    const t = s.trials[0];
+    await saveInitial(s.sessionId, ans(t.itemId), store);
+    const first = await showAi(s.sessionId, t.itemId, store);
+    const shownAt = (await store.listTrials(s.sessionId))[0].aiShownAt;
+    const second = await showAi(s.sessionId, t.itemId, store);
+    expect(second).toEqual(first);
+    expect((await store.listTrials(s.sessionId))[0].aiShownAt).toBe(shownAt);
+    expect((await getSessionState(s.sessionId, store)).trials[0].ai).toEqual(first);
+  });
 
-    const counts = await storage.getParticipantCounts();
-    expect(counts).toEqual({ started: 2, completed: 1 });
-    expect(computeAdminStats(rows, counts).labelsCollected).toBe(6);
+  it("lock the participant's own answer once the AI has been shown", async () => {
+    const s = await started("assisted");
+    const t = s.trials[0];
+    await saveInitial(s.sessionId, ans(t.itemId, "Real"), store);
+    await showAi(s.sessionId, t.itemId, store);
+    expect((await failure(() => saveInitial(s.sessionId, ans(t.itemId, "Satire"), store))).code).toBe("conflict");
+  });
+
+  it("need the AI to have been shown before the final answer, and the final answer before moving on", async () => {
+    const s = await started("assisted");
+    const [t1, t2] = s.trials;
+    await saveInitial(s.sessionId, ans(t1.itemId, "Real"), store);
+    expect((await failure(() => saveFinal(s.sessionId, ans(t1.itemId), store))).code).toBe("invalid");
+    expect((await failure(() => saveInitial(s.sessionId, ans(t2.itemId), store))).code).toBe("invalid");
+    await showAi(s.sessionId, t1.itemId, store);
+    await saveFinal(s.sessionId, ans(t1.itemId, "Satire", 5), store);
+    const changed = await failure(() => saveFinal(s.sessionId, ans(t1.itemId, "Real", 5), store));
+    expect(changed.code).toBe("conflict");
+    await saveInitial(s.sessionId, ans(t2.itemId), store);
+    expect((await getSessionState(s.sessionId, store)).trials[0]).toMatchObject({
+      initialAnswer: "Real",
+      finalAnswer: "Satire",
+      finalConfidence: 5,
+    });
+  });
+
+  it("the attention check has no AI and needs one answer", async () => {
+    const s = await started("assisted");
+    const catchTrial = s.trials.find((t) => t.isCatch)!;
+    for (const t of s.trials) {
+      if (t === catchTrial) break;
+      await saveInitial(s.sessionId, ans(t.itemId), store);
+      await showAi(s.sessionId, t.itemId, store);
+      await saveFinal(s.sessionId, ans(t.itemId), store);
+    }
+    await saveInitial(s.sessionId, ans(catchTrial.itemId, "Real"), store);
+    expect((await failure(() => showAi(s.sessionId, catchTrial.itemId, store))).code).toBe("forbidden");
+    const next = s.trials[catchTrial.position]; // the trial after the catch
+    await saveInitial(s.sessionId, ans(next.itemId), store); // allowed: the catch is done
+  });
+});
+
+describe("completion", () => {
+  it("needs every trial answered", async () => {
+    const s = await started("baseline");
+    await saveInitial(s.sessionId, ans(s.trials[0].itemId), store);
+    expect((await failure(() => completeSession(s.sessionId, null, store))).code).toBe("invalid");
+  });
+
+  it("scores the answer that counts, excluding the attention check, and stores the comment", async () => {
+    for (const condition of ["baseline", "assisted"] as const) {
+      const s = await started(condition, `scorer-${condition}`);
+      await answerAll(s, (i) => i % 2 === 0);
+      const scoredRight = s.trials.filter((t, i) => !t.isCatch && i % 2 === 0).length;
+      const summary = await completeSession(s.sessionId, "fun", store);
+      expect(summary).toEqual({ condition, code: `scorer-${condition}`, correct: scoredRight, total: STUDY_TRIALS });
+      expect((await store.getSession(s.sessionId))!.comment).toBe("fun");
+      expect(await getSummary(s.sessionId, store)).toEqual(summary);
+      expect(await completeSession(s.sessionId, "again", store)).toEqual(summary); // idempotent
+      expect((await store.getSession(s.sessionId))!.comment).toBe("fun");
+    }
+  });
+
+  it("in the assisted condition the final answer counts, not the first one", async () => {
+    const s = await started("assisted");
+    await answerAll(s); // first answers all wrong, final answers all right
+    expect((await completeSession(s.sessionId, null, store)).correct).toBe(STUDY_TRIALS);
+  });
+
+  it("no answers after completion, and no score before it", async () => {
+    const s = await started("baseline");
+    expect((await failure(() => getSummary(s.sessionId, store))).code).toBe("forbidden");
+    await answerAll(s);
+    await completeSession(s.sessionId, null, store);
+    expect((await failure(() => saveInitial(s.sessionId, ans(s.trials[0].itemId), store))).code).toBe("conflict");
+  });
+
+  it("a terminated or unchecked session cannot be completed", async () => {
+    const s = await startSession({ condition: "baseline", code: "blue-otter-7" }, store);
+    expect((await failure(() => completeSession(s.sessionId, null, store))).code).toBe("conflict");
+    await answerCheck(s.sessionId, "funny", store);
+    await answerCheck(s.sessionId, "funny", store);
+    expect((await failure(() => completeSession(s.sessionId, null, store))).code).toBe("conflict");
+  });
+});
+
+describe("privacy", () => {
+  it("the participant's view of a session never carries the answer key", async () => {
+    const s = await started("assisted");
+    await saveInitial(s.sessionId, ans(s.trials[0].itemId), store);
+    await showAi(s.sessionId, s.trials[0].itemId, store);
+    const state = await getSessionState(s.sessionId, store);
+    for (const t of state.trials) {
+      expect(Object.keys(t)).not.toContain("label");
+      expect(Object.keys(t)).not.toContain("type");
+    }
+    expect(JSON.stringify(state)).not.toMatch(/"(type|topic|source)"/);
   });
 });

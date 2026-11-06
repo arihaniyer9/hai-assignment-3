@@ -1158,3 +1158,121 @@ table.data tr:last-child td {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------- 7. Satire-study additions (Assignment 3) ---------- */
+/* Two answer cards side by side from phone width up; three check options stacked. */
+.option-grid--two {
+  grid-template-columns: 1fr 1fr !important;
+}
+.option-grid--stack {
+  grid-template-columns: 1fr !important;
+}
+.option__face--plain {
+  padding-right: 14px;
+}
+.option__sub {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.recap {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+/* The AI panel: suggestion, confidence, badge and the marked headline. */
+.ai-panel {
+  margin: 0 0 20px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.ai-panel__title {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.ai-panel__verdict {
+  font-size: 1.15rem;
+  margin: 0 0 12px;
+}
+.ai-panel__headline {
+  font-size: 1.2rem;
+  line-height: 2.4;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 768px) {
+  .ai-panel__headline {
+    font-size: 1.35rem;
+  }
+}
+.badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 0 10px;
+  font-size: 0.8125rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--muted);
+  vertical-align: middle;
+}
+/* Word marks: blue = toward Satire (solid underline, +), orange = toward Real (dashed, −).
+   Direction is always also given by line style and sign, never by colour alone. */
+.ai-word {
+  display: inline-block;
+  line-height: 1.15;
+  text-align: center;
+  padding: 2px 4px 0;
+  margin: 0 1px;
+  border-radius: 6px;
+}
+.ai-word--satire {
+  background: rgb(42 120 214 / var(--strength));
+  border-bottom: 3px solid light-dark(#2a78d6, #7fb2ff);
+}
+.ai-word--real {
+  background: rgb(235 104 52 / var(--strength));
+  border-bottom: 3px dashed light-dark(#c4501f, #ffa27a);
+}
+.ai-word__value {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--text);
+}
+.ai-key--satire {
+  border-bottom: 2px solid light-dark(#2a78d6, #7fb2ff);
+}
+.ai-key--real {
+  border-bottom: 2px dashed light-dark(#c4501f, #ffa27a);
+}
+
+/* Landing page links to the two parts. */
+.link-grid {
+  display: grid;
+  gap: 16px;
+}
+@media (min-width: 640px) {
+  .link-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.link-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.link-card:hover {
+  border-color: var(--accent);
+}
+.link-card:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}

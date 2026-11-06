@@ -1,8 +1,8 @@
 /**
  * app/layout.tsx
  *
- * Root layout shared by every page: document shell, skip link, header with
- * navigation, main landmark, and a footer carrying the dataset citation.
+ * Root layout shared by every page: document shell, skip link, header, main
+ * landmark, and a short footer.
  * Styles live in globals.css; the system font stack is used (no web fonts to
  * download, better privacy and speed).
  */
@@ -14,11 +14,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Emotion Labeling Task",
-    template: "%s | Emotion Labeling Task",
+    default: "Satire or Real?",
+    template: "%s | Satire or Real?",
   },
-  description:
-    "A short research task: label the emotion expressed in 5 tweets from the Emotion dataset.",
+  description: "A short class study: decide whether news headlines are satire or real, with and without an AI.",
 };
 
 export const viewport: Viewport = {
@@ -50,13 +49,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <header className="site-header">
           <div className="container site-header__inner">
             <Link href="/" className="brand">
-              Emotion Labeling Task
+              Satire or Real?
             </Link>
             <div className="site-header__right">
-              <nav aria-label="Site" className="site-nav">
-                <Link href="/">Task</Link>
-                <Link href="/reflection">Reflection</Link>
-              </nav>
               <ThemeToggle />
             </div>
           </div>
@@ -65,12 +60,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <footer className="site-footer">
           <div className="container">
             <p>
-              Tweets are from the Emotion dataset (Saravia et al., 2018,{" "}
-              <a href="https://huggingface.co/datasets/dair-ai/emotion">dair-ai/emotion</a>). Course
-              project for Human-AI Interaction.
+              Headlines were collected from public satire and news websites for a Human-AI Interaction course
+              project. The AI is a word-based model trained on a public headline dataset.
             </p>
             <p>
-              <Link href="/reflection">Reflection</Link> ·{" "}
               <Link href="/admin">Researcher login</Link>
             </p>
           </div>

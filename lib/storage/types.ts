@@ -1,61 +1,68 @@
 /**
  * lib/storage/types.ts
  *
- * The persistence contract. The app talks only to this interface; two
- * implementations exist: SQLite (local development and tests) and Supabase
- * Postgres (production). Storage is intentionally "dumb": all business rules
- * (who may label what, when a participant is complete) live in `lib/service.ts`
- * so they are written once and behave identically on both back ends.
+ * The persistence contract. Two implementations: SQLite (local development and tests) and Supabase
+ * Postgres (production). Storage is deliberately "dumb": every study rule (order of steps, no
+ * changing an answer once the AI has been shown, one open session per code and condition) lives in
+ * lib/service.ts, so it is written once and behaves the same on both back ends.
  */
-import type { LabelInput } from "../types";
-import type {
-  AdminRow,
-  DebriefItem,
-  ParticipantCounts,
-  ParticipantState,
-  TweetSeed,
-} from "../types";
+import type { Answer, Condition } from "../constants";
+import type { AiOutput, ItemSeed, SessionRecord, TrialRecord } from "../types";
 
-/** Persistence operations required by the app. */
+export type { Answer };
+
+/** Fields of a session the service may change after creation. */
+export type SessionPatch = Partial<
+  Pick<SessionRecord, "checkFailures" | "checkPassedAt" | "terminatedAt" | "completedAt" | "comment">
+>;
+
+/** Fields of a trial the service may fill in, step by step. */
+export type TrialPatch = Partial<{
+  initialAnswer: Answer;
+  initialConfidence: number;
+  initialTimeMs: number;
+  initialAt: string;
+  ai: AiOutput;
+  aiShownAt: string;
+  finalAnswer: Answer;
+  finalConfidence: number;
+  finalTimeMs: number;
+  finalAt: string;
+}>;
+
+export type CreateSessionResult = "ok" | "id_taken" | "code_taken";
+
 export interface Storage {
-  /** Inserts or updates the tweet pool (idempotent, keyed by tweet id). */
-  seedTweets(tweets: readonly TweetSeed[]): Promise<void>;
-
-  /** Returns every tweet in the pool, including ground truth (server use only). */
-  listTweets(): Promise<TweetSeed[]>;
+  /** Inserts or updates the item pool (idempotent, keyed by id). */
+  seedItems(items: readonly ItemSeed[]): Promise<void>;
+  /** Every item, including the answer key (server use only). */
+  listItems(): Promise<ItemSeed[]>;
 
   /**
-   * Inserts a participant row.
-   * @returns false when the ID already exists (caller retries with a new ID).
+   * Inserts a session. Returns "code_taken" when this code already has a session in this condition
+   * that was not terminated (a database constraint, so two tabs cannot race past it).
    */
-  createParticipant(p: { id: string; nickname: string | null; consentedAt: string }): Promise<boolean>;
+  createSession(s: {
+    id: string;
+    code: string;
+    condition: Condition;
+    consentedAt: string;
+  }): Promise<CreateSessionResult>;
+  getSession(id: string): Promise<SessionRecord | null>;
+  /** The code's session in this condition that was not terminated, if any. */
+  findOpenSession(code: string, condition: Condition): Promise<SessionRecord | null>;
+  updateSession(id: string, patch: SessionPatch): Promise<void>;
 
-  /** Removes a participant and its rows (used to roll back a failed start). */
-  deleteParticipant(id: string): Promise<void>;
+  /** Item ids already given to any session with this code. */
+  seenItemIds(code: string): Promise<Set<string>>;
+  /** Creates one empty trial per item; index + 1 is the position. */
+  createTrials(sessionId: string, itemIds: readonly string[]): Promise<void>;
+  /** A session's trials joined with their items, by position. */
+  listTrials(sessionId: string): Promise<TrialRecord[]>;
+  updateTrial(sessionId: string, itemId: string, patch: TrialPatch): Promise<void>;
 
-  /** Stores the participant's 5 tweets; index + 1 becomes each `position`. */
-  createAssignments(participantId: string, tweetIds: readonly string[]): Promise<void>;
-
-  /** Loads a participant's resumable state (no ground truth), or null if unknown. */
-  getParticipantState(id: string): Promise<ParticipantState | null>;
-
-  /** Inserts or replaces the participant's label for one tweet. */
-  upsertLabel(
-    participantId: string,
-    tweetId: string,
-    input: LabelInput,
-    submittedAt: string,
-  ): Promise<void>;
-
-  /** Marks the participant as completed. */
-  completeParticipant(id: string, completedAt: string): Promise<void>;
-
-  /** Joins a participant's labels with tweet text and ground truth, by position. */
-  getParticipantResults(id: string): Promise<DebriefItem[]>;
-
-  /** All labels joined with participant and tweet data, oldest first. */
-  listAllLabelRows(): Promise<AdminRow[]>;
-
-  /** How many participants have started / completed the task. */
-  getParticipantCounts(): Promise<ParticipantCounts>;
+  /** Admin: every session, oldest first. */
+  listAllSessions(): Promise<SessionRecord[]>;
+  /** Admin: every trial joined with its item, by session then position. */
+  listAllTrials(): Promise<TrialRecord[]>;
 }

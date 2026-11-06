@@ -1,49 +1,112 @@
 /**
  * lib/storage/supabase.ts
  *
- * Supabase (Postgres) implementation of {@link Storage}, used in production.
- * Talks to the database through supabase-js with the SERVICE-ROLE key, so it
- * must only ever run on the server. Table definitions are in
- * `supabase/schema.sql`.
+ * Supabase (Postgres) implementation of {@link Storage}, used in production. Uses the SERVICE-ROLE
+ * key, so it must only run on the server. Tables are defined in supabase/schema.sql.
+ * tests/storage-contract.test.ts runs the same contract against this back end when
+ * SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Emotion, LabelKey } from "../emotions";
-import type {
-  AdminRow,
-  DebriefItem,
-  LabelInput,
-  ParticipantCounts,
-  ParticipantState,
-  TweetSeed,
-} from "../types";
-import type { Storage } from "./types";
+import type { Answer, Condition } from "../constants";
+import type { AiOutput, ItemSeed, SessionRecord, TrialRecord } from "../types";
+import type { SessionPatch, Storage, TrialPatch } from "./types";
 
-/** PostgREST returns at most 1000 rows per request; we page through larger tables. */
+/** PostgREST returns at most 1000 rows per request; larger reads are paged. */
 const PAGE = 1000;
 
-/** Row shapes as returned by PostgREST for the queries below. */
-interface LabelRow {
-  participant_id: string;
-  tweet_id: string;
-  label: LabelKey;
-  confidence: number;
-  rationale: string | null;
-  time_spent_ms: number;
-  submitted_at: string;
-}
-interface AssignmentRow {
-  participant_id: string;
-  tweet_id: string;
-  position: number;
+interface SessionRow {
+  id: string;
+  code: string;
+  condition: Condition;
+  consented_at: string;
+  check_failures: number;
+  check_passed_at: string | null;
+  terminated_at: string | null;
+  completed_at: string | null;
+  comment: string | null;
 }
 
-/**
- * Throws if a Supabase response carries an error, otherwise returns its data.
- *
- * @param res A supabase-js response `{ data, error }`.
- * @returns The non-null `data`.
- * @throws Error with the database message when `error` is set.
- */
+interface TrialRow {
+  session_id: string;
+  item_id: string;
+  position: number;
+  initial_answer: Answer | null;
+  initial_confidence: number | null;
+  initial_time_ms: number | null;
+  initial_at: string | null;
+  ai_json: AiOutput | null;
+  ai_shown_at: string | null;
+  final_answer: Answer | null;
+  final_confidence: number | null;
+  final_time_ms: number | null;
+  final_at: string | null;
+  items: { headline: string; label: Answer; type: string };
+}
+
+const TRIAL_FIELDS =
+  "session_id, item_id, position, initial_answer, initial_confidence, initial_time_ms, initial_at, " +
+  "ai_json, ai_shown_at, final_answer, final_confidence, final_time_ms, final_at, " +
+  "items!inner(headline, label, type)";
+
+const toSession = (r: SessionRow): SessionRecord => ({
+  id: r.id,
+  code: r.code,
+  condition: r.condition,
+  consentedAt: r.consented_at,
+  checkFailures: r.check_failures,
+  checkPassedAt: r.check_passed_at,
+  terminatedAt: r.terminated_at,
+  completedAt: r.completed_at,
+  comment: r.comment,
+});
+
+const toTrial = (r: TrialRow): TrialRecord => ({
+  sessionId: r.session_id,
+  itemId: r.item_id,
+  position: r.position,
+  headline: r.items.headline,
+  label: r.items.label,
+  type: r.items.type,
+  initialAnswer: r.initial_answer,
+  initialConfidence: r.initial_confidence,
+  initialTimeMs: r.initial_time_ms,
+  initialAt: r.initial_at,
+  ai: r.ai_json,
+  aiShownAt: r.ai_shown_at,
+  finalAnswer: r.final_answer,
+  finalConfidence: r.final_confidence,
+  finalTimeMs: r.final_time_ms,
+  finalAt: r.final_at,
+});
+
+const SESSION_COLUMNS: Record<keyof SessionPatch, string> = {
+  checkFailures: "check_failures",
+  checkPassedAt: "check_passed_at",
+  terminatedAt: "terminated_at",
+  completedAt: "completed_at",
+  comment: "comment",
+};
+const TRIAL_COLUMNS: Record<keyof TrialPatch, string> = {
+  initialAnswer: "initial_answer",
+  initialConfidence: "initial_confidence",
+  initialTimeMs: "initial_time_ms",
+  initialAt: "initial_at",
+  ai: "ai_json",
+  aiShownAt: "ai_shown_at",
+  finalAnswer: "final_answer",
+  finalConfidence: "final_confidence",
+  finalTimeMs: "final_time_ms",
+  finalAt: "final_at",
+};
+
+function columns(map: Record<string, string>, patch: object): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(patch)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => [map[k], v]),
+  );
+}
+
 function unwrap<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(`Supabase: ${res.error.message}`);
   return res.data as T;
@@ -54,19 +117,12 @@ function unwrap<T>(res: { data: T | null; error: { message: string } | null }): 
  *
  * @param url The project URL (SUPABASE_URL).
  * @param serviceRoleKey The service-role secret (SUPABASE_SERVICE_ROLE_KEY).
- * @returns A ready-to-use {@link Storage}.
  */
 export function createSupabaseStorage(url: string, serviceRoleKey: string): Storage {
   const sb: SupabaseClient = createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  /**
-   * Reads every row of a query by paging with `.range()`.
-   *
-   * @param build Function that returns a fresh query for a given [from, to] range.
-   * @returns All rows, concatenated.
-   */
   async function fetchAll<T>(
     build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
   ): Promise<T[]> {
@@ -79,241 +135,120 @@ export function createSupabaseStorage(url: string, serviceRoleKey: string): Stor
   }
 
   return {
-    /** Inserts or updates the whole tweet pool (idempotent, keyed by tweet id). */
-    async seedTweets(tweets) {
-      const rows = tweets.map((t) => ({ id: t.id, text: t.text, ground_truth: t.groundTruth }));
-      unwrap(await sb.from("tweets").upsert(rows, { onConflict: "id" }).select("id"));
+    async seedItems(items) {
+      unwrap(await sb.from("items").upsert([...items], { onConflict: "id" }).select("id"));
     },
 
-    /** Returns every tweet in the pool including ground truth (server-side use only). */
-    async listTweets() {
-      const rows = await fetchAll<{ id: string; text: string; ground_truth: Emotion }>((from, to) =>
-        sb.from("tweets").select("id, text, ground_truth").order("id").range(from, to),
+    async listItems() {
+      return fetchAll<ItemSeed>((from, to) =>
+        sb.from("items").select("id, headline, label, type, topic, source").order("id").range(from, to),
       );
-      return rows.map((r): TweetSeed => ({ id: r.id, text: r.text, groundTruth: r.ground_truth }));
     },
 
-    /** Inserts a participant row; returns false if the ID is already taken so the caller can retry. */
-    async createParticipant({ id, nickname, consentedAt }) {
+    async createSession({ id, code, condition, consentedAt }) {
       const { error } = await sb
-        .from("participants")
-        .insert({ id, nickname, consented_at: consentedAt, created_at: consentedAt });
-      if (!error) return true;
-      if (error.code === "23505") return false; // unique_violation: ID already taken
+        .from("sessions")
+        .insert({ id, code, condition, consented_at: consentedAt });
+      if (!error) return "ok";
+      if (error.code === "23505") {
+        // unique_violation: which constraint tells us whether the id or the open code clashed
+        return error.message.includes("sessions_open_code") ? "code_taken" : "id_taken";
+      }
       throw new Error(`Supabase: ${error.message}`);
     },
 
-    /** Deletes a participant; assignments and labels are removed by ON DELETE CASCADE. */
-    async deleteParticipant(id) {
-      unwrap(await sb.from("participants").delete().eq("id", id).select("id"));
+    async getSession(id) {
+      const row = unwrap(await sb.from("sessions").select("*").eq("id", id).maybeSingle()) as SessionRow | null;
+      return row ? toSession(row) : null;
     },
 
-    /** Stores the participant's 5 tweets, using each tweet's index + 1 as its position. */
-    async createAssignments(participantId, tweetIds) {
-      const rows = tweetIds.map((tweet_id, i) => ({
-        participant_id: participantId,
-        tweet_id,
-        position: i + 1,
-      }));
-      unwrap(await sb.from("assignments").insert(rows).select("tweet_id"));
+    async findOpenSession(code, condition) {
+      const row = unwrap(
+        await sb
+          .from("sessions")
+          .select("*")
+          .eq("code", code)
+          .eq("condition", condition)
+          .is("terminated_at", null)
+          .maybeSingle(),
+      ) as SessionRow | null;
+      return row ? toSession(row) : null;
     },
 
-    /** Loads a participant's resumable state (tweets + saved labels, no ground truth), or null if unknown. */
-    async getParticipantState(id) {
-      const { data: p, error } = await sb
-        .from("participants")
-        .select("id, nickname, completed_at")
-        .eq("id", id)
-        .maybeSingle();
-      if (error) throw new Error(`Supabase: ${error.message}`);
-      if (!p) return null;
-
-      const assignments = unwrap(
-        await sb
-          .from("assignments")
-          .select("tweet_id, position")
-          .eq("participant_id", id)
-          .order("position"),
-      ) as { tweet_id: string; position: number }[];
-      const tweetRows = assignments.length
-        ? (unwrap(
-            await sb
-              .from("tweets")
-              .select("id, text")
-              .in(
-                "id",
-                assignments.map((a) => a.tweet_id),
-              ),
-          ) as { id: string; text: string }[])
-        : [];
-      const textById = new Map(tweetRows.map((t) => [t.id, t.text]));
-      const labels = unwrap(
-        await sb
-          .from("labels")
-          .select("tweet_id, label, confidence, rationale, time_spent_ms, submitted_at")
-          .eq("participant_id", id),
-      ) as Omit<LabelRow, "participant_id">[];
-
-      const state: ParticipantState = {
-        participantId: p.id,
-        nickname: p.nickname,
-        completed: p.completed_at !== null,
-        tweets: assignments.map((a) => ({
-          id: a.tweet_id,
-          text: textById.get(a.tweet_id) ?? "",
-          position: a.position,
-        })),
-        labels: labels.map((l) => ({
-          tweetId: l.tweet_id,
-          label: l.label,
-          confidence: l.confidence,
-          rationale: l.rationale,
-          timeSpentMs: l.time_spent_ms,
-          submittedAt: l.submitted_at,
-        })),
-      };
-      return state;
+    async updateSession(id, patch) {
+      const values = columns(SESSION_COLUMNS, patch);
+      if (Object.keys(values).length === 0) return;
+      unwrap(await sb.from("sessions").update(values).eq("id", id).select("id"));
     },
 
-    /** Inserts the participant's label for a tweet, or replaces it if one already exists. */
-    async upsertLabel(participantId, tweetId, input: LabelInput, submittedAt) {
-      unwrap(
+    async seenItemIds(code) {
+      const sessions = unwrap(await sb.from("sessions").select("id").eq("code", code)) as { id: string }[];
+      if (sessions.length === 0) return new Set();
+      const rows = unwrap(
         await sb
-          .from("labels")
-          .upsert(
-            {
-              participant_id: participantId,
-              tweet_id: tweetId,
-              label: input.label,
-              confidence: input.confidence,
-              rationale: input.rationale,
-              time_spent_ms: input.timeSpentMs,
-              submitted_at: submittedAt,
-            },
-            { onConflict: "participant_id,tweet_id" },
-          )
-          .select("tweet_id"),
-      );
-    },
-
-    /** Marks the participant as submitted by setting completed_at. */
-    async completeParticipant(id, completedAt) {
-      unwrap(
-        await sb.from("participants").update({ completed_at: completedAt }).eq("id", id).select("id"),
-      );
-    },
-
-    /** Joins the participant's labels with tweet text and ground truth, ordered by position. */
-    async getParticipantResults(id) {
-      const assignments = unwrap(
-        await sb
-          .from("assignments")
-          .select("tweet_id, position")
-          .eq("participant_id", id)
-          .order("position"),
-      ) as { tweet_id: string; position: number }[];
-      if (!assignments.length) return [];
-      const tweets = unwrap(
-        await sb
-          .from("tweets")
-          .select("id, text, ground_truth")
+          .from("trials")
+          .select("item_id")
           .in(
-            "id",
-            assignments.map((a) => a.tweet_id),
+            "session_id",
+            sessions.map((s) => s.id),
           ),
-      ) as { id: string; text: string; ground_truth: Emotion }[];
-      const labels = unwrap(
-        await sb.from("labels").select("tweet_id, label, confidence").eq("participant_id", id),
-      ) as { tweet_id: string; label: LabelKey; confidence: number }[];
-      const tweetById = new Map(tweets.map((t) => [t.id, t]));
-      const labelById = new Map(labels.map((l) => [l.tweet_id, l]));
-
-      const items: DebriefItem[] = [];
-      for (const a of assignments) {
-        const t = tweetById.get(a.tweet_id);
-        const l = labelById.get(a.tweet_id);
-        if (!t || !l) continue;
-        items.push({
-          position: a.position,
-          tweetId: a.tweet_id,
-          text: t.text,
-          yourLabel: l.label,
-          confidence: l.confidence,
-          groundTruth: t.ground_truth,
-        });
-      }
-      return items;
+      ) as { item_id: string }[];
+      return new Set(rows.map((r) => r.item_id));
     },
 
-    /** Returns every label joined with participant and tweet data (admin table and CSV), oldest first. */
-    async listAllLabelRows() {
-      const labels = await fetchAll<LabelRow>((from, to) =>
-        sb
-          .from("labels")
-          .select("participant_id, tweet_id, label, confidence, rationale, time_spent_ms, submitted_at")
-          .order("submitted_at")
-          .order("participant_id")
-          .order("tweet_id")
-          .range(from, to),
+    async createTrials(sessionId, itemIds) {
+      const rows = itemIds.map((item_id, i) => ({ session_id: sessionId, item_id, position: i + 1 }));
+      unwrap(await sb.from("trials").insert(rows).select("item_id"));
+    },
+
+    async listTrials(sessionId) {
+      const rows = unwrap(
+        await sb.from("trials").select(TRIAL_FIELDS).eq("session_id", sessionId).order("position"),
+      ) as unknown as TrialRow[];
+      return rows.map(toTrial);
+    },
+
+    async updateTrial(sessionId, itemId, patch) {
+      const values = columns(TRIAL_COLUMNS, patch);
+      if (Object.keys(values).length === 0) return;
+      unwrap(
+        await sb
+          .from("trials")
+          .update(values)
+          .eq("session_id", sessionId)
+          .eq("item_id", itemId)
+          .select("item_id"),
       );
-      const [participants, tweets, assignments] = await Promise.all([
-        fetchAll<{ id: string; nickname: string | null; completed_at: string | null }>((from, to) =>
-          sb.from("participants").select("id, nickname, completed_at").order("id").range(from, to),
-        ),
-        fetchAll<{ id: string; text: string; ground_truth: Emotion }>((from, to) =>
-          sb.from("tweets").select("id, text, ground_truth").order("id").range(from, to),
-        ),
-        fetchAll<AssignmentRow>((from, to) =>
+    },
+
+    async listAllSessions() {
+      const rows = await fetchAll<SessionRow>((from, to) =>
+        sb.from("sessions").select("*").order("consented_at").order("id").range(from, to),
+      );
+      return rows.map(toSession);
+    },
+
+    async listAllTrials() {
+      const sessions = await this.listAllSessions();
+      const order = new Map(sessions.map((s, i) => [s.id, i]));
+      const rows = await fetchAll<TrialRow>(
+        (from, to) =>
           sb
-            .from("assignments")
-            .select("participant_id, tweet_id, position")
-            .order("participant_id")
-            .order("tweet_id")
-            .range(from, to),
-        ),
-      ]);
-      const participantById = new Map(participants.map((p) => [p.id, p]));
-      const tweetById = new Map(tweets.map((t) => [t.id, t]));
-      const positionByKey = new Map(
-        assignments.map((a) => [`${a.participant_id}|${a.tweet_id}`, a.position]),
+            .from("trials")
+            .select(TRIAL_FIELDS)
+            .order("session_id")
+            .order("position")
+            .range(from, to) as unknown as PromiseLike<{
+            data: TrialRow[] | null;
+            error: { message: string } | null;
+          }>,
       );
-
-      return labels.map((l): AdminRow => {
-        const p = participantById.get(l.participant_id);
-        const t = tweetById.get(l.tweet_id);
-        const groundTruth = (t?.ground_truth ?? "joy") as Emotion;
-        return {
-          participantId: l.participant_id,
-          nickname: p?.nickname ?? null,
-          participantCompleted: Boolean(p?.completed_at),
-          position: positionByKey.get(`${l.participant_id}|${l.tweet_id}`) ?? 0,
-          tweetId: l.tweet_id,
-          tweetText: t?.text ?? "",
-          label: l.label,
-          groundTruth,
-          matchesGroundTruth: l.label === groundTruth,
-          confidence: l.confidence,
-          rationale: l.rationale,
-          timeSpentMs: l.time_spent_ms,
-          submittedAt: l.submitted_at,
-        };
-      });
-    },
-
-    /** Counts participants who started and who completed the task. */
-    async getParticipantCounts() {
-      const started = await sb.from("participants").select("id", { count: "exact", head: true });
-      const completed = await sb
-        .from("participants")
-        .select("id", { count: "exact", head: true })
-        .not("completed_at", "is", null);
-      if (started.error) throw new Error(`Supabase: ${started.error.message}`);
-      if (completed.error) throw new Error(`Supabase: ${completed.error.message}`);
-      const counts: ParticipantCounts = {
-        started: started.count ?? 0,
-        completed: completed.count ?? 0,
-      };
-      return counts;
+      return rows
+        .map(toTrial)
+        .sort(
+          (a, b) =>
+            (order.get(a.sessionId) ?? 0) - (order.get(b.sessionId) ?? 0) || a.position - b.position,
+        );
     },
   };
 }

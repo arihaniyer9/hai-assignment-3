@@ -1,67 +1,99 @@
 /**
- * tests/ids-validation.test.ts — participant IDs and API input schemas.
+ * tests/ids-validation.test.ts — session ids and every API input schema.
  */
 import { describe, expect, it } from "vitest";
-import { ID_ALPHABET, PARTICIPANT_ID_RE, generateParticipantId } from "../lib/ids";
+import { ID_ALPHABET, SESSION_ID_RE, generateSessionId } from "../lib/ids";
 import {
+  MAX_TIME_MS,
   adminLoginSchema,
-  createParticipantSchema,
-  labelSubmitSchema,
-  MAX_TIME_SPENT_MS,
+  aiSchema,
+  answerSchema,
+  checkSchema,
+  completeSchema,
+  sessionIdSchema,
+  startSchema,
 } from "../lib/validation";
 
-describe("generateParticipantId", () => {
-  it("produces IDs like P-XXXXXX using only unambiguous characters", () => {
+describe("generateSessionId", () => {
+  it("produces ids like S-XXXXXX from unambiguous characters", () => {
     for (let i = 0; i < 200; i++) {
-      const id = generateParticipantId();
-      expect(id).toMatch(PARTICIPANT_ID_RE);
+      const id = generateSessionId();
+      expect(id).toMatch(SESSION_ID_RE);
       for (const ch of id.slice(2)) expect(ID_ALPHABET).toContain(ch);
     }
     expect(ID_ALPHABET).not.toMatch(/[01ILO]/);
   });
-});
-
-describe("createParticipantSchema", () => {
-  it("requires consent to be exactly true", () => {
-    expect(createParticipantSchema.safeParse({}).success).toBe(false);
-    expect(createParticipantSchema.safeParse({ consent: false }).success).toBe(false);
-    expect(createParticipantSchema.safeParse({ consent: true }).success).toBe(true);
-  });
-  it("trims the nickname, drops blanks and control characters, caps length", () => {
-    expect(createParticipantSchema.parse({ consent: true, nickname: "  Sam  " }).nickname).toBe("Sam");
-    expect(createParticipantSchema.parse({ consent: true, nickname: "   " }).nickname).toBeUndefined();
-    expect(createParticipantSchema.parse({ consent: true, nickname: "a\u0000b" }).nickname).toBe("a b");
-    expect(createParticipantSchema.safeParse({ consent: true, nickname: "x".repeat(31) }).success).toBe(false);
+  it("sessionIdSchema accepts generated ids and rejects anything else", () => {
+    expect(sessionIdSchema.safeParse(generateSessionId()).success).toBe(true);
+    for (const bad of ["P-7F3K9Q", "S-7F3K9", "S-7F3K9QQ", "s-7f3k9q", "S-7F3K0Q", "../x"]) {
+      expect(sessionIdSchema.safeParse(bad).success).toBe(false);
+    }
   });
 });
 
-describe("labelSubmitSchema", () => {
-  const ok = { tweetId: "t001", label: "joy", confidence: 4, rationale: "  happy words ", timeSpentMs: 5200 };
-  it("accepts a valid label and trims the rationale", () => {
-    const parsed = labelSubmitSchema.parse(ok);
-    expect(parsed.rationale).toBe("happy words");
+describe("startSchema", () => {
+  const ok = { condition: "baseline", code: "blue-otter-7", consent: true };
+  it("accepts a valid start", () => {
+    expect(startSchema.parse(ok)).toEqual(ok);
   });
-  it("turns an empty/missing rationale into null", () => {
-    expect(labelSubmitSchema.parse({ ...ok, rationale: "" }).rationale).toBeNull();
-    expect(labelSubmitSchema.parse({ ...ok, rationale: undefined }).rationale).toBeNull();
+  it("trims and lower-cases the code so the same person types it either way", () => {
+    expect(startSchema.parse({ ...ok, code: "  Blue-Otter-7 " }).code).toBe("blue-otter-7");
   });
-  it("rejects unknown labels and out-of-range confidence", () => {
-    expect(labelSubmitSchema.safeParse({ ...ok, label: "disgust" }).success).toBe(false);
-    expect(labelSubmitSchema.safeParse({ ...ok, confidence: 0 }).success).toBe(false);
-    expect(labelSubmitSchema.safeParse({ ...ok, confidence: 6 }).success).toBe(false);
-    expect(labelSubmitSchema.safeParse({ ...ok, confidence: 2.5 }).success).toBe(false);
+  it("rejects codes that are too short, too long, or use other characters", () => {
+    for (const code of ["ab", "x".repeat(25), "blue otter", "-blue", "ötter7", "a;drop", ""]) {
+      expect(startSchema.safeParse({ ...ok, code }).success, code).toBe(false);
+    }
   });
-  it("accepts 'unsure' and clamps absurd timings", () => {
-    expect(labelSubmitSchema.parse({ ...ok, label: "unsure" }).label).toBe("unsure");
-    expect(labelSubmitSchema.parse({ ...ok, timeSpentMs: 9e9 }).timeSpentMs).toBe(MAX_TIME_SPENT_MS);
+  it("requires consent to be exactly true and a known condition", () => {
+    expect(startSchema.safeParse({ ...ok, consent: false }).success).toBe(false);
+    expect(startSchema.safeParse({ ...ok, consent: undefined }).success).toBe(false);
+    expect(startSchema.safeParse({ ...ok, condition: "control" }).success).toBe(false);
   });
-  it("rejects rationales over 500 characters", () => {
-    expect(labelSubmitSchema.safeParse({ ...ok, rationale: "x".repeat(501) }).success).toBe(false);
+});
+
+describe("checkSchema", () => {
+  it("accepts only the listed options", () => {
+    expect(checkSchema.safeParse({ answer: "source" }).success).toBe(true);
+    expect(checkSchema.safeParse({ answer: "funny" }).success).toBe(true);
+    expect(checkSchema.safeParse({ answer: "anything" }).success).toBe(false);
+  });
+});
+
+describe("answerSchema", () => {
+  const ok = { itemId: "h123", answer: "Satire", confidence: 4, timeMs: 5200.4 };
+  it("accepts a valid answer and rounds the time", () => {
+    expect(answerSchema.parse(ok).timeMs).toBe(5200);
+  });
+  it("rejects unknown answers and out-of-range or fractional confidence", () => {
+    expect(answerSchema.safeParse({ ...ok, answer: "satire" }).success).toBe(false);
+    for (const confidence of [0, 6, 2.5]) {
+      expect(answerSchema.safeParse({ ...ok, confidence }).success).toBe(false);
+    }
+  });
+  it("clamps absurd times instead of rejecting the answer, and rejects negative ones", () => {
+    expect(answerSchema.parse({ ...ok, timeMs: 9e9 }).timeMs).toBe(MAX_TIME_MS);
+    expect(answerSchema.safeParse({ ...ok, timeMs: -1 }).success).toBe(false);
+  });
+  it("aiSchema needs an item id", () => {
+    expect(aiSchema.safeParse({ itemId: "h1" }).success).toBe(true);
+    expect(aiSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("completeSchema", () => {
+  it("trims the comment, turns blanks into null, removes control characters", () => {
+    expect(completeSchema.parse({ comment: "  nice  " }).comment).toBe("nice");
+    expect(completeSchema.parse({ comment: "   " }).comment).toBeNull();
+    expect(completeSchema.parse({}).comment).toBeNull();
+    expect(completeSchema.parse({ comment: "a\u0000b" }).comment).toBe("a b");
+  });
+  it("rejects comments over 1000 characters", () => {
+    expect(completeSchema.safeParse({ comment: "x".repeat(1001) }).success).toBe(false);
   });
 });
 
 describe("adminLoginSchema", () => {
-  it("requires a non-empty password", () => {
+  it("needs a non-empty password", () => {
     expect(adminLoginSchema.safeParse({ password: "" }).success).toBe(false);
     expect(adminLoginSchema.safeParse({ password: "pw" }).success).toBe(true);
   });

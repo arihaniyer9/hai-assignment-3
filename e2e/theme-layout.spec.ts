@@ -4,9 +4,7 @@
  * Checks two things a user asked for:
  *   1. The Light / Dark / Auto theme switch works, is remembered, and never
  *      flashes the wrong theme on reload.
- *   2. On a wide desktop screen the layout uses the available width: a wide
- *      content area, instructions beside the start panel, and the tweet beside
- *      the answer controls.
+ *   2. On a wide desktop screen the instructions sit beside the start panel.
  *
  * Runs after flow.spec.ts and responsive.spec.ts (alphabetical order), because
  * flow.spec.ts asserts exact row counts in the shared test database.
@@ -71,7 +69,7 @@ test.describe("theme switch", () => {
     expect(await background(page)).toBe(LIGHT_BG);
     await chooseTheme(page, "Dark");
     expect(await background(page)).toBe(DARK_BG);
-    await page.goto("/reflection");
+    await page.goto("/baseline");
     expect(await background(page)).toBe(DARK_BG);
     await context.close();
   });
@@ -92,25 +90,11 @@ test.describe("theme switch", () => {
 test.describe("wide desktop layout (1470x900)", () => {
   test.use({ viewport: { width: 1470, height: 900 } });
 
-  test("home: wide content, instructions beside the start panel", async ({ page }) => {
-    await page.goto("/");
-    const container = (await page.locator("main .container").first().boundingBox())!;
-    expect(container.width).toBeGreaterThan(1150); // was 720 before
+  test("instructions sit beside the start panel, visible without scrolling", async ({ page }) => {
+    await page.goto("/baseline");
     const instructions = (await page.getByRole("heading", { name: "What you will do" }).boundingBox())!;
-    const start = (await page.getByRole("heading", { name: "Ready to start?" }).boundingBox())!;
-    expect(start.x).toBeGreaterThan(instructions.x + 500); // side by side, not stacked
-    expect(start.y).toBeLessThan(900); // visible without scrolling
-  });
-
-  test("task: tweet on the left, answer controls on the right", async ({ page }) => {
-    await page.goto("/");
-    await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: "Start the task" }).click();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Tweet 1 of 5");
-    const tweet = (await page.locator(".tweet-card").boundingBox())!;
-    const options = (await page.locator(".option-grid").boundingBox())!;
-    expect(options.x).toBeGreaterThan(tweet.x + tweet.width - 1); // right of the tweet
-    expect(Math.abs(options.y - tweet.y)).toBeLessThan(200); // roughly level with it
-    expect(tweet.x + tweet.width + options.width).toBeGreaterThan(1000);
+    const startPanel = (await page.getByRole("heading", { name: "Ready to start?" }).boundingBox())!;
+    expect(startPanel.x).toBeGreaterThan(instructions.x + 500);
+    expect(startPanel.y).toBeLessThan(900);
   });
 });

@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server";
 import type { ZodType } from "zod";
 import { ServiceError, type ServiceErrorCode } from "./service";
-import { participantIdSchema } from "./validation";
+import { sessionIdSchema } from "./validation";
 
 /** HTTP status for each ServiceError category. */
 const STATUS_BY_CODE: Record<ServiceErrorCode, number> = {
@@ -23,7 +23,7 @@ const STATUS_BY_CODE: Record<ServiceErrorCode, number> = {
 };
 
 /**
- * Builds a JSON response that must never be cached (all data is per-participant).
+ * Builds a JSON response that must never be cached (all data is per-session).
  *
  * @param data JSON-serialisable body.
  * @param status HTTP status (default 200).
@@ -86,15 +86,15 @@ export async function readBody<T>(
 }
 
 /**
- * Validates the `[id]` path segment as a participant ID.
+ * Validates the `[id]` path segment as a session ID.
  *
  * @param params The route's params promise (`{ id }`).
  * @returns The ID, or a 404 response for malformed IDs (indistinguishable from unknown ones).
  */
-export async function readParticipantId(
+export async function readSessionId(
   params: Promise<{ id: string }>,
 ): Promise<{ id: string; response?: undefined } | { id?: undefined; response: NextResponse }> {
-  const parsed = participantIdSchema.safeParse((await params).id);
-  if (!parsed.success) return { response: errorResponse(404, "not_found", "Participant not found.") };
+  const parsed = sessionIdSchema.safeParse((await params).id);
+  if (!parsed.success) return { response: errorResponse(404, "not_found", "Session not found.") };
   return { id: parsed.data };
 }

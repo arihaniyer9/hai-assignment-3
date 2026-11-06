@@ -5,22 +5,14 @@
  *
  *   SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY set  -> Supabase Postgres
  *   otherwise, when NODE_ENV !== "production"      -> local SQLite file
- *   otherwise (production without Supabase)        -> throw (never silently
- *                                                     fall back to an ephemeral
- *                                                     SQLite file on Vercel)
+ *   otherwise (production without Supabase)        -> throw, never an ephemeral SQLite file
  *
- * The instance is cached on `globalThis` so it survives hot reloads in dev.
+ * The instance is cached on `globalThis` so it survives hot reloads in development.
  */
 import type { Storage } from "./types";
 
 const globalForStorage = globalThis as unknown as { __storagePromise?: Promise<Storage> };
 
-/**
- * Builds the storage for the current environment (see file comment).
- *
- * @returns A ready-to-use {@link Storage}.
- * @throws Error when running in production without Supabase configuration.
- */
 async function createStorage(): Promise<Storage> {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -34,26 +26,20 @@ async function createStorage(): Promise<Storage> {
         "(SQLite is only available outside production).",
     );
   }
-  // Loaded lazily so the SQLite module is never touched in production.
-  const [{ createSqliteStorage }, { loadTweetSeeds }] = await Promise.all([
+  const [{ createSqliteStorage }, { loadItemSeeds }] = await Promise.all([
     import("./sqlite"),
-    import("../dataset"),
+    import("../items"),
   ]);
   const storage = createSqliteStorage(process.env.SQLITE_PATH ?? ".data/dev.sqlite");
-  // Convenience for local dev: make sure the pool is present.
-  if ((await storage.listTweets()).length === 0) await storage.seedTweets(loadTweetSeeds());
+  // Local convenience: make sure the item pool is present.
+  if ((await storage.listItems()).length === 0) await storage.seedItems(loadItemSeeds());
   return storage;
 }
 
-/**
- * Returns the process-wide Storage, creating it on first use.
- *
- * @returns The shared {@link Storage} instance.
- */
+/** The process-wide Storage, created on first use; a failed creation is not cached. */
 export function getStorage(): Promise<Storage> {
   if (!globalForStorage.__storagePromise) {
     globalForStorage.__storagePromise = createStorage().catch((err) => {
-      // Do not cache a failure: allow a retry after the configuration is fixed.
       globalForStorage.__storagePromise = undefined;
       throw err;
     });

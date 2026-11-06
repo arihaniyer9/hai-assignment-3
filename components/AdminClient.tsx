@@ -4,20 +4,21 @@
  *
  * The researcher dashboard at /admin. It first asks the server for the data:
  * a 401 means "not logged in" and the login form is shown. Once logged in it
- * shows summary statistics, a participant filter, the table of who labeled
- * which tweet with which label, and a CSV download.
+ * shows the session counts and accuracy per condition, the two CSV downloads
+ * used by the analysis, and a table of sessions.
  *
  * The table is a real <table> on wide screens and turns into labelled cards on
  * phones (see globals.css), so it never forces sideways scrolling of the page.
  */
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api-client";
-import { LABEL_KEYS, labelName } from "@/lib/emotions";
-import type { AdminRow, AdminStats } from "@/lib/types";
+import { CONDITIONS } from "@/lib/constants";
+import type { AdminStats, SessionRecord, TrialRecord } from "@/lib/types";
 
 /** Loaded dashboard data. */
 interface Data {
-  rows: AdminRow[];
+  sessions: SessionRecord[];
+  trials: TrialRecord[];
   stats: AdminStats;
 }
 
@@ -57,7 +58,6 @@ export function AdminClient() {
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [filter, setFilter] = useState("all");
 
   /**
    * Applies a fetch outcome to component state: data -> dashboard, 401 -> login form.
@@ -156,60 +156,33 @@ export function AdminClient() {
     );
   }
 
-  const { rows, stats } = data;
-  const participants = Array.from(new Set(rows.map((r) => r.participantId)));
-  const shown = filter === "all" ? rows : rows.filter((r) => r.participantId === filter);
-  const rate = stats.matchRate === null ? "n/a" : `${Math.round(stats.matchRate * 100)}%`;
+  const { sessions, trials, stats } = data;
+  const pct = (v: number | null) => (v === null ? "n/a" : `${Math.round(v * 100)}%`);
+  const statusOf = (s: SessionRecord) =>
+    s.terminatedAt ? "stopped at check" : s.completedAt ? "completed" : s.checkPassedAt ? "in progress" : "at check";
+  const answered = (id: string) => trials.filter((t) => t.sessionId === id && t.initialAnswer !== null).length;
 
   return (
     <>
       <h1>Collected data</h1>
-
       <div className="stat-grid">
+        {CONDITIONS.map((c) => (
+          <div className="stat" key={c}>
+            <div className="stat__value">
+              {stats.sessions[c].completed} / {stats.sessions[c].started}
+            </div>
+            <div className="stat__label">
+              {c} sessions completed / started ({stats.sessions[c].terminated} stopped); accuracy {pct(stats.accuracy[c])}
+            </div>
+          </div>
+        ))}
         <div className="stat">
-          <div className="stat__value">{stats.participantsStarted}</div>
-          <div className="stat__label">participants started</div>
-        </div>
-        <div className="stat">
-          <div className="stat__value">{stats.participantsCompleted}</div>
-          <div className="stat__label">participants completed</div>
-        </div>
-        <div className="stat">
-          <div className="stat__value">{stats.labelsCollected}</div>
-          <div className="stat__label">labels collected</div>
-        </div>
-        <div className="stat">
-          <div className="stat__value">{rate}</div>
-          <div className="stat__label">labels matching dataset</div>
+          <div className="stat__value">{stats.trialsAnswered}</div>
+          <div className="stat__label">trials answered</div>
         </div>
       </div>
 
-      <h2 className="sr-only">Label counts</h2>
-      <ul className="label-counts" aria-label="How often each label was chosen">
-        {LABEL_KEYS.map((k) => (
-          <li key={k}>
-            {labelName(k)}: <strong>{stats.labelCounts[k]}</strong>
-          </li>
-        ))}
-      </ul>
-
       <div className="toolbar">
-        <div className="field">
-          <label htmlFor="participant-filter">Filter by participant</label>
-          <select
-            id="participant-filter"
-            className="input"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          >
-            <option value="all">All participants ({participants.length})</option>
-            {participants.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </div>
         <div className="toolbar__actions">
           <button
             type="button"
@@ -221,8 +194,11 @@ export function AdminClient() {
           >
             Refresh
           </button>
-          <a className="btn btn--primary" href="/api/admin/data?format=csv" download>
-            Download CSV
+          <a className="btn btn--primary" href="/api/admin/data?format=trials" download>
+            Download trials.csv
+          </a>
+          <a className="btn btn--primary" href="/api/admin/data?format=sessions" download>
+            Download sessions.csv
           </a>
           <button type="button" className="btn btn--secondary" onClick={logout}>
             Sign out
@@ -230,48 +206,41 @@ export function AdminClient() {
         </div>
       </div>
 
-      {shown.length === 0 ? (
-        <div className="notice">No labels have been submitted yet.</div>
+      {sessions.length === 0 ? (
+        <div className="notice">No sessions yet.</div>
       ) : (
         <div className="table-wrap">
           <table className="data">
-            <caption className="sr-only">Who labeled which tweet with which label</caption>
+            <caption className="sr-only">Every session</caption>
             <thead>
               <tr>
-                <th scope="col">Participant</th>
-                <th scope="col">Nickname</th>
-                <th scope="col">#</th>
-                <th scope="col">Tweet</th>
-                <th scope="col">Label</th>
-                <th scope="col">Dataset label</th>
-                <th scope="col">Match</th>
-                <th scope="col">Confidence</th>
-                <th scope="col">Rationale</th>
-                <th scope="col">Time (s)</th>
-                <th scope="col">Submitted</th>
+                <th scope="col">Session</th>
+                <th scope="col">Code</th>
+                <th scope="col">Condition</th>
+                <th scope="col">Status</th>
+                <th scope="col">Check fails</th>
+                <th scope="col">Answered</th>
+                <th scope="col">Started</th>
+                <th scope="col">Comment</th>
               </tr>
             </thead>
             <tbody>
-              {shown.map((r) => (
-                <tr key={`${r.participantId}-${r.tweetId}`}>
-                  <td data-label="Participant" className="nowrap">
-                    <strong>{r.participantId}</strong>
-                    {!r.participantCompleted && <span className="muted"> (in progress)</span>}
+              {sessions.map((s) => (
+                <tr key={s.id}>
+                  <td data-label="Session" className="nowrap">
+                    <strong>{s.id}</strong>
                   </td>
-                  <td data-label="Nickname">{r.nickname ?? "-"}</td>
-                  <td data-label="#">{r.position}</td>
-                  <td data-label="Tweet" className="wrap">
-                    {r.tweetText}
+                  <td data-label="Code">{s.code}</td>
+                  <td data-label="Condition">{s.condition}</td>
+                  <td data-label="Status">{statusOf(s)}</td>
+                  <td data-label="Check fails">{s.checkFailures}</td>
+                  <td data-label="Answered">{answered(s.id)}</td>
+                  <td data-label="Started" className="nowrap">
+                    {formatTime(s.consentedAt)}
                   </td>
-                  <td data-label="Label">{labelName(r.label)}</td>
-                  <td data-label="Dataset label">{labelName(r.groundTruth)}</td>
-                  <td data-label="Match">{r.matchesGroundTruth ? "✓ Yes" : "No"}</td>
-                  <td data-label="Confidence">{r.confidence}/5</td>
-                  <td data-label="Rationale" className="wrap">
-                    {r.rationale ?? "-"}
+                  <td data-label="Comment" className="wrap">
+                    {s.comment ?? "-"}
                   </td>
-                  <td data-label="Time (s)">{(r.timeSpentMs / 1000).toFixed(1)}</td>
-                  <td data-label="Submitted" className="nowrap">{formatTime(r.submittedAt)}</td>
                 </tr>
               ))}
             </tbody>

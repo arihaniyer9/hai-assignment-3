@@ -1,96 +1,108 @@
 /**
  * lib/types.ts
  *
- * Plain data types shared by the storage layer, the service layer, the API
- * routes and the React components. Nothing here has runtime behaviour.
+ * Plain data types shared by the storage layer, the service layer, the API routes and the React
+ * components. Nothing here has runtime behaviour.
  *
- * Privacy note: types used by the labeling phase (TweetPublic, ParticipantState)
- * deliberately have NO ground-truth field, so the compiler helps us keep the
- * answer key away from participants until they have submitted.
+ * Privacy: the types sent to participants during the task (TrialPublic, SessionState) have NO
+ * ground-truth field, so the compiler helps keep the answer key away from them.
  */
-import type { Emotion, LabelKey } from "./emotions";
+import type { Answer, Condition } from "./constants";
 
-/** A tweet as stored in the pool, including the answer key (server only). */
-export interface TweetSeed {
+/** A headline in the pool, with its answer key (server only). */
+export interface ItemSeed {
   id: string;
-  text: string;
-  groundTruth: Emotion;
+  headline: string;
+  label: Answer;
+  /** One of ITEM_TYPES for study items, or "catch" for the attention check. */
+  type: string;
+  topic: string;
+  source: string;
 }
 
-/** A tweet as shown to a participant while labeling (no ground truth). */
-export interface TweetPublic {
+/** What the AI showed for one trial, exactly as logged. */
+export interface AiOutput {
+  label: Answer;
+  /** Calibrated probability that the headline is satire. */
+  probSatire: number;
+  /** Probability of the suggested label (what the participant sees as "% sure"). */
+  confidence: number;
+  /** True when confidence reaches the frozen A2 threshold. */
+  confident: boolean;
+  /** Per-word pushes: UTF-16 spans into the headline, positive toward Satire. */
+  words: { text: string; start: number; end: number; value: number }[];
+}
+
+/** One trial as the participant's browser sees it: no ground truth. */
+export interface TrialPublic {
+  position: number;
+  itemId: string;
+  headline: string;
+  isCatch: boolean;
+  initialAnswer: Answer | null;
+  initialConfidence: number | null;
+  ai: AiOutput | null;
+  finalAnswer: Answer | null;
+  finalConfidence: number | null;
+}
+
+export type SessionStatus = "check" | "trials" | "done" | "terminated";
+
+/** Everything the client needs to show or resume a session. */
+export interface SessionState {
+  sessionId: string;
+  code: string;
+  condition: Condition;
+  status: SessionStatus;
+  checkFailures: number;
+  trials: TrialPublic[];
+}
+
+/** A stored session (server side). */
+export interface SessionRecord {
   id: string;
-  text: string;
-  /** 1-based position in this participant's personal sequence. */
+  code: string;
+  condition: Condition;
+  consentedAt: string;
+  checkFailures: number;
+  checkPassedAt: string | null;
+  terminatedAt: string | null;
+  completedAt: string | null;
+  comment: string | null;
+}
+
+/** A stored trial (server side), including the item's answer key. */
+export interface TrialRecord {
+  sessionId: string;
+  itemId: string;
   position: number;
+  headline: string;
+  label: Answer;
+  type: string;
+  initialAnswer: Answer | null;
+  initialConfidence: number | null;
+  initialTimeMs: number | null;
+  initialAt: string | null;
+  ai: AiOutput | null;
+  aiShownAt: string | null;
+  finalAnswer: Answer | null;
+  finalConfidence: number | null;
+  finalTimeMs: number | null;
+  finalAt: string | null;
 }
 
-/** What a participant submits for one tweet. */
-export interface LabelInput {
-  label: LabelKey;
-  /** Self-reported confidence, 1 (not at all sure) to 5 (very sure). */
-  confidence: number;
-  rationale: string | null;
-  /** Visible-tab milliseconds spent on this tweet. */
-  timeSpentMs: number;
+/** The end-of-session summary shown to the participant. */
+export interface DebriefSummary {
+  condition: Condition;
+  code: string;
+  correct: number;
+  total: number;
 }
 
-/** A stored label for one tweet. */
-export interface LabelRecord extends LabelInput {
-  tweetId: string;
-  submittedAt: string;
-}
-
-/** Everything the client needs to resume a participant's session. */
-export interface ParticipantState {
-  participantId: string;
-  nickname: string | null;
-  completed: boolean;
-  tweets: TweetPublic[];
-  labels: LabelRecord[];
-}
-
-/** One row of the post-submission debrief (ground truth is revealed here). */
-export interface DebriefItem {
-  position: number;
-  tweetId: string;
-  text: string;
-  yourLabel: LabelKey;
-  confidence: number;
-  groundTruth: Emotion;
-}
-
-/** One joined row for the admin table and CSV export. */
-export interface AdminRow {
-  participantId: string;
-  nickname: string | null;
-  participantCompleted: boolean;
-  position: number;
-  tweetId: string;
-  tweetText: string;
-  label: LabelKey;
-  groundTruth: Emotion;
-  /** True when the participant's label equals the dataset label. */
-  matchesGroundTruth: boolean;
-  confidence: number;
-  rationale: string | null;
-  timeSpentMs: number;
-  submittedAt: string;
-}
-
-/** Participant totals for the admin summary. */
-export interface ParticipantCounts {
-  started: number;
-  completed: number;
-}
-
-/** Aggregated numbers shown on the admin dashboard. */
+/** Admin dashboard numbers. */
 export interface AdminStats {
-  participantsStarted: number;
-  participantsCompleted: number;
-  labelsCollected: number;
-  /** Share (0-1) of labels equal to the dataset label; null when no labels. */
-  matchRate: number | null;
-  /** How often each label (incl. "unsure") was chosen. */
-  labelCounts: Record<LabelKey, number>;
+  sessions: Record<Condition, { started: number; completed: number; terminated: number }>;
+  /** Accuracy of completed sessions' study trials, per condition; null when none. */
+  accuracy: Record<Condition, number | null>;
+  trialsAnswered: number;
 }

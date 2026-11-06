@@ -1,54 +1,62 @@
 -- supabase/schema.sql
 --
--- Postgres schema for the emotion-labeling task. Run this once in the Supabase
+-- Postgres schema for the satire-vs-real study (Assignment 3). Run it once in the Supabase
 -- dashboard (SQL Editor -> New query -> paste -> Run) BEFORE `npm run seed`.
 --
--- Security model: Row Level Security is ENABLED on every table and NO policies
--- are defined. That means the public `anon` key can read/write nothing. Only the
--- server (Next.js API routes) accesses the data, using the service-role key,
--- which bypasses RLS. Never expose the service-role key to the browser.
+-- Security model: Row Level Security is ENABLED on every table and NO policies are defined, so the
+-- public `anon` key can read or write nothing. Only the server (Next.js API routes) touches the data,
+-- with the service-role key, which bypasses RLS. Never expose that key to the browser.
 
-create table if not exists public.tweets (
-  id           text primary key,
-  text         text not null,
-  ground_truth text not null
-    check (ground_truth in ('anger','fear','joy','love','sadness','surprise'))
+-- The 240 Assignment 2 study headlines plus the attention-check item, with the answer key.
+create table if not exists public.items (
+  id       text primary key,
+  headline text not null,
+  label    text not null check (label in ('Satire','Real')),
+  type     text not null,
+  topic    text not null,
+  source   text not null
 );
 
-create table if not exists public.participants (
-  id           text primary key,
-  nickname     text,
-  consented_at timestamptz not null,
-  created_at   timestamptz not null default now(),
-  completed_at timestamptz
+-- One row per person per condition. `code` is the self-chosen code that pairs a person's two
+-- sessions; nothing else identifies them.
+create table if not exists public.sessions (
+  id              text primary key,
+  code            text not null,
+  condition       text not null check (condition in ('baseline','assisted')),
+  consented_at    timestamptz not null,
+  check_failures  int not null default 0,
+  check_passed_at timestamptz,
+  terminated_at   timestamptz,
+  completed_at    timestamptz,
+  comment         text
 );
 
--- The 5 tweets randomly drawn for each participant, and the order they see them.
-create table if not exists public.assignments (
-  participant_id text not null references public.participants(id) on delete cascade,
-  tweet_id       text not null references public.tweets(id),
-  position       int  not null check (position between 1 and 5),
-  primary key (participant_id, tweet_id),
-  unique (participant_id, position)
+-- At most one open (not terminated) session per code and condition, enforced by the database.
+create unique index if not exists sessions_open_code
+  on public.sessions (code, condition) where terminated_at is null;
+
+-- One row per trial: what was shown, each answer, the AI output exactly as displayed, and times.
+create table if not exists public.trials (
+  session_id         text not null references public.sessions(id) on delete cascade,
+  item_id            text not null references public.items(id),
+  position           int  not null check (position >= 1),
+  initial_answer     text check (initial_answer in ('Satire','Real')),
+  initial_confidence int  check (initial_confidence between 1 and 5),
+  initial_time_ms    int  check (initial_time_ms >= 0),
+  initial_at         timestamptz,
+  ai_json            jsonb,
+  ai_shown_at        timestamptz,
+  final_answer       text check (final_answer in ('Satire','Real')),
+  final_confidence   int  check (final_confidence between 1 and 5),
+  final_time_ms      int  check (final_time_ms >= 0),
+  final_at           timestamptz,
+  primary key (session_id, item_id),
+  unique (session_id, position)
 );
 
--- WHO labeled WHICH tweet with WHICH label (the core research data).
-create table if not exists public.labels (
-  participant_id text not null references public.participants(id) on delete cascade,
-  tweet_id       text not null references public.tweets(id),
-  label          text not null
-    check (label in ('anger','fear','joy','love','sadness','surprise','unsure')),
-  confidence     int  not null check (confidence between 1 and 5),
-  rationale      text,
-  time_spent_ms  int  not null check (time_spent_ms >= 0),
-  submitted_at   timestamptz not null,
-  primary key (participant_id, tweet_id)
-);
+create index if not exists trials_item_idx on public.trials (item_id);
+create index if not exists sessions_code_idx on public.sessions (code);
 
-create index if not exists labels_submitted_at_idx on public.labels (submitted_at);
-create index if not exists assignments_tweet_idx on public.assignments (tweet_id);
-
-alter table public.tweets       enable row level security;
-alter table public.participants enable row level security;
-alter table public.assignments  enable row level security;
-alter table public.labels       enable row level security;
+alter table public.items    enable row level security;
+alter table public.sessions enable row level security;
+alter table public.trials   enable row level security;

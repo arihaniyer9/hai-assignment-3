@@ -1,63 +1,68 @@
 /**
  * lib/validation.ts
  *
- * zod schemas that validate every piece of input arriving at the API. Nothing
- * from the network reaches the storage layer without passing through one of
- * these. Schemas double as the documentation of each endpoint's request body.
+ * zod schemas for every input arriving at the API. Nothing from the network reaches the service or
+ * storage layer without passing through one of these.
  */
 import { z } from "zod";
-import { LABEL_KEYS } from "./emotions";
-import { PARTICIPANT_ID_RE } from "./ids";
+import { ANSWERS, CODE_RE, CONDITIONS, CONFIDENCE_MAX, CONFIDENCE_MIN } from "./constants";
+import { SESSION_ID_RE } from "./ids";
+import { CHECK_OPTIONS } from "./instructions";
 
-/** Longest visible-tab time we accept for a single tweet (30 minutes). */
-export const MAX_TIME_SPENT_MS = 30 * 60 * 1000;
+/** Longest time we record for one step (30 minutes); longer values are clamped, not rejected. */
+export const MAX_TIME_MS = 30 * 60 * 1000;
+export const MAX_COMMENT = 1000;
 
-/** Longest allowed nickname and rationale, in characters. */
-export const MAX_NICKNAME = 30;
-export const MAX_RATIONALE = 500;
-
-/** Removes ASCII control characters (keeps normal text, tabs become spaces). */
+/** Removes ASCII control characters (tabs and newlines become spaces). */
 const stripControl = (s: string) => s.replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
 
-/** Body of POST /api/participants: optional nickname + mandatory consent. */
-export const createParticipantSchema = z.object({
-  nickname: z
-    .string()
-    .max(MAX_NICKNAME)
-    .optional()
-    .transform((v) => (v ? stripControl(v) : "") || undefined),
+/** A participant code: trimmed and lower-cased before it is checked. */
+export const codeSchema = z
+  .string()
+  .max(64)
+  .transform((v) => v.trim().toLowerCase())
+  .pipe(z.string().regex(CODE_RE));
+
+/** POST /api/sessions */
+export const startSchema = z.object({
+  condition: z.enum(CONDITIONS),
+  code: codeSchema,
   consent: z.literal(true),
 });
 
-/** Body of PUT /api/participants/[id]/labels: one tweet's answer. */
-export const labelSubmitSchema = z.object({
-  tweetId: z.string().min(1).max(20),
-  label: z.enum(LABEL_KEYS),
-  confidence: z.number().int().min(1).max(5),
-  rationale: z
-    .string()
-    .max(MAX_RATIONALE)
-    .nullish()
-    .transform((v) => (v ? v.trim() : "") || null),
-  // Clamp rather than reject so an idle tab never blocks a valid answer.
-  timeSpentMs: z
+/** POST /api/sessions/[id]/check */
+export const checkSchema = z.object({
+  answer: z.enum(CHECK_OPTIONS.map((o) => o.id) as [string, ...string[]]),
+});
+
+/** PUT /api/sessions/[id]/initial and /final */
+export const answerSchema = z.object({
+  itemId: z.string().min(1).max(40),
+  answer: z.enum(ANSWERS),
+  confidence: z.number().int().min(CONFIDENCE_MIN).max(CONFIDENCE_MAX),
+  timeMs: z
     .number()
     .min(0)
-    .transform((v) => Math.min(Math.round(v), MAX_TIME_SPENT_MS)),
+    .transform((v) => Math.min(Math.round(v), MAX_TIME_MS)),
 });
 
-/** Body of POST /api/admin/login. */
-export const adminLoginSchema = z.object({
-  password: z.string().min(1).max(200),
+/** POST /api/sessions/[id]/ai */
+export const aiSchema = z.object({ itemId: z.string().min(1).max(40) });
+
+/** POST /api/sessions/[id]/complete */
+export const completeSchema = z.object({
+  comment: z
+    .string()
+    .max(MAX_COMMENT)
+    .nullish()
+    .transform((v) => (v ? stripControl(v) : "") || null),
 });
 
-/** A participant ID taken from a URL path segment. */
-export const participantIdSchema = z.string().regex(PARTICIPANT_ID_RE);
+/** POST /api/admin/login */
+export const adminLoginSchema = z.object({ password: z.string().min(1).max(200) });
 
-/** Parsed (output) type of {@link createParticipantSchema}; nickname may be omitted. */
-export interface CreateParticipantInput {
-  nickname?: string;
-  consent: true;
-}
-/** Parsed (output) type of {@link labelSubmitSchema}. */
-export type LabelSubmitInput = z.output<typeof labelSubmitSchema>;
+/** A session id from a URL path segment. */
+export const sessionIdSchema = z.string().regex(SESSION_ID_RE);
+
+export type StartBody = z.output<typeof startSchema>;
+export type AnswerBody = z.output<typeof answerSchema>;
