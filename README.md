@@ -70,15 +70,27 @@ Open http://localhost:3000/baseline and http://localhost:3000/assisted. Without 
 | `npm run test:e2e` | Browser tests (Playwright); also regenerates `docs/screenshots/` |
 | `npm run test:contract` | The storage contract test, also against Supabase when `.env.local` has its settings |
 | `npm run seed` | Loads the items into the active database |
+| `npm run db:schema` / `npm run db:reset -- --yes` | Create the Supabase tables / delete all sessions and trials (keeps items) |
 
 ## 5. Deploy (Supabase + Vercel)
 
-1. Create a new Supabase project. In the **SQL Editor**, run all of `supabase/schema.sql`.
-2. Create `.env.local` from `.env.example` with the project URL, the `service_role` key, an admin password and a session secret (`openssl rand -hex 32`).
-3. Load the items: `npm run seed`. Expect "Seeded 241 items into Supabase".
-4. Check the real database: `npm run test:contract`. It must report the Supabase tests as passed. Then run `supabase/reset.sql` in the SQL Editor to remove the test rows.
-5. Import the GitHub repo in Vercel and set the same four variables. Deploy.
-6. Do a dry run on the live site, check `/admin`, then run `supabase/reset.sql` again before real participants.
+1. Create a new Supabase project.
+2. Create `.env.local` from `.env.example`. You need:
+   - `SUPABASE_URL`: the `https://<ref>.supabase.co` project URL, not the Postgres string;
+   - `SUPABASE_SERVICE_ROLE_KEY`: the service-role key;
+   - `DATABASE_URL`: the session-pooler Postgres string, for the local scripts only;
+   - an admin password, and a session secret from `openssl rand -hex 32`.
+3. Create the tables:
+
+   ```sh
+   npm run db:schema
+   ```
+
+   This runs `supabase/schema.sql` over a verified TLS connection, using Supabase's public root certificate committed in `supabase/prod-ca-2021.crt`, and confirms Row Level Security is on. Pasting the file into the SQL Editor does the same.
+4. Load the items: `npm run seed`. Expect "Seeded 241 items into Supabase".
+5. Check the real database: `npm run test:contract`. Four tests must pass: two on SQLite and two on Supabase. Then remove the test rows with `npm run db:reset -- --yes`, which prints the counts before and after.
+6. Import the GitHub repo in Vercel and set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` (not `DATABASE_URL`). Deploy.
+7. Do a dry run on the live site, check `/admin`, then run `npm run db:reset -- --yes` again before real participants. Never reset once collection has started.
 
 ## 6. Data dictionary
 

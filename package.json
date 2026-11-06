@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:contract": "SUPABASE_CONTRACT_TEST=1 node --env-file-if-exists=.env.local node_modules/vitest/vitest.mjs run tests/storage-contract.test.ts",
-    "check": "next typegen && tsc --noEmit && eslint . && vitest run"
+    "check": "next typegen && tsc --noEmit && eslint . && vitest run",
+    "db:schema": "tsx --env-file-if-exists=.env.local scripts/apply-schema.ts",
+    "db:reset": "tsx --env-file-if-exists=.env.local scripts/reset-db.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -24,10 +26,12 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/node": "^24.13.6",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "pg": "^8.23.1",
     "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^5.0.1"
