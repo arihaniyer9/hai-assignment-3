@@ -33,11 +33,11 @@ export function sessionOrder(sessions: readonly SessionRecord[]): Map<string, nu
 }
 
 export const TRIAL_HEADERS = [
-  "session_id", "code", "condition", "session_order", "session_completed",
+  "session_id", "code", "condition", "app_version", "session_order", "session_completed",
   "position", "item_id", "is_catch", "item_type", "headline", "label",
-  "initial_answer", "initial_correct", "initial_confidence", "initial_time_ms", "initial_at",
+  "initial_answer", "initial_correct", "initial_confidence", "initial_time_ms", "initial_at", "initial_revisions",
   "ai_label", "ai_prob_satire", "ai_confidence", "ai_confident", "ai_correct", "ai_words", "ai_shown_at",
-  "final_answer", "final_correct", "final_confidence", "final_time_ms", "final_at",
+  "final_answer", "final_correct", "final_confidence", "final_time_ms", "final_at", "final_revisions",
   "switched", "scored_answer", "scored_correct",
 ] as const; // prettier-ignore
 
@@ -51,14 +51,16 @@ export function trialRows(sessions: readonly SessionRecord[], trials: readonly T
     const s = byId.get(t.sessionId)!;
     const scored = scoredAnswer(s.condition, t);
     return [
-      s.id, s.code, s.condition, order.get(s.id) ?? null, s.completedAt !== null,
+      s.id, s.code, s.condition, s.appVersion ?? "1", order.get(s.id) ?? null, s.completedAt !== null,
       t.position, t.itemId, isCatch(t), t.type, t.headline, t.label,
       t.initialAnswer, correct(t.initialAnswer, t.label), t.initialConfidence, t.initialTimeMs, t.initialAt,
+      t.initialRevisions,
       t.ai?.label ?? null, t.ai?.probSatire ?? null, t.ai?.confidence ?? null, t.ai?.confident ?? null,
       t.ai ? t.ai.label === t.label : null,
       t.ai ? t.ai.words.map((w) => `${w.text}:${w.value.toFixed(3)}`).join(";") : null,
       t.aiShownAt,
       t.finalAnswer, correct(t.finalAnswer, t.label), t.finalConfidence, t.finalTimeMs, t.finalAt,
+      t.finalRevisions,
       t.finalAnswer === null || t.initialAnswer === null ? null : t.finalAnswer !== t.initialAnswer,
       scored, correct(scored, t.label),
     ]; // prettier-ignore
@@ -66,7 +68,7 @@ export function trialRows(sessions: readonly SessionRecord[], trials: readonly T
 }
 
 export const SESSION_HEADERS = [
-  "session_id", "code", "condition", "session_order", "consented_at", "check_failures",
+  "session_id", "code", "condition", "app_version", "session_order", "consented_at", "check_failures",
   "check_passed_at", "terminated_at", "completed_at", "catch_passed", "study_trials_answered",
   "study_trials_correct", "accuracy", "comment",
 ] as const; // prettier-ignore
@@ -79,7 +81,7 @@ export function sessionRows(sessions: readonly SessionRecord[], trials: readonly
     const answered = own.filter((t) => !isCatch(t) && scoredAnswer(s.condition, t) !== null);
     const right = answered.filter((t) => scoredAnswer(s.condition, t) === t.label).length;
     return [
-      s.id, s.code, s.condition, order.get(s.id) ?? null, s.consentedAt, s.checkFailures,
+      s.id, s.code, s.condition, s.appVersion ?? "1", order.get(s.id) ?? null, s.consentedAt, s.checkFailures,
       s.checkPassedAt, s.terminatedAt, s.completedAt,
       catchTrial?.initialAnswer == null ? null : catchTrial.initialAnswer === catchTrial.label,
       answered.length, right, answered.length ? right / answered.length : null, s.comment,

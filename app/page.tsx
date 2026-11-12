@@ -24,6 +24,10 @@ export default function HomePage() {
           <p className="muted">You answer first, then see what an AI suggests, then give your final answer.</p>
         </Link>
       </div>
+      <p>
+        Finished both parts? <Link href="/results">See your results</Link>: every headline, the correct answers and
+        how the AI compared.
+      </p>
     </div>
   );
 }

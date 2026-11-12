@@ -5,7 +5,15 @@
  * typed data or rejects with an {@link ApiError} whose message is safe to show to the participant.
  */
 import type { Answer, Condition } from "./constants";
-import type { AdminStats, AiOutput, DebriefSummary, SessionRecord, SessionState, TrialRecord } from "./types";
+import type {
+  AdminStats,
+  AiOutput,
+  DebriefSummary,
+  ParticipantResults,
+  SessionRecord,
+  SessionState,
+  TrialRecord,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -58,6 +66,7 @@ export const api = {
   complete: (id: string, comment: string) =>
     request<DebriefSummary>(`/api/sessions/${id}/complete`, post({ comment })),
   summary: (id: string) => request<DebriefSummary>(`/api/sessions/${id}/summary`),
+  results: (code: string) => request<ParticipantResults>(`/api/results?code=${encodeURIComponent(code)}`),
   adminLogin: (password: string) => request<{ ok: true }>("/api/admin/login", post({ password })),
   adminLogout: () => request<{ ok: true }>("/api/admin/logout", { method: "POST" }),
   adminData: () =>

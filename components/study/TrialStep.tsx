@@ -25,12 +25,16 @@ interface Props {
   assisted: boolean;
   busy: boolean;
   error: string | null;
+  /** When going back to change a saved answer: the answer and confidence to start from. */
+  prefill?: { answer: Answer; confidence: number };
   onSubmit: (answer: Answer, confidence: number, timeMs: number) => void;
 }
 
-export function TrialStep({ trial, phase, number, total, assisted, busy, error, onSubmit }: Props) {
-  const [answer, setAnswer] = useState<Answer | null>(phase === "final" ? trial.initialAnswer : null);
-  const [confidence, setConfidence] = useState<number | null>(null);
+export function TrialStep({ trial, phase, number, total, assisted, busy, error, prefill, onSubmit }: Props) {
+  const [answer, setAnswer] = useState<Answer | null>(
+    prefill?.answer ?? (phase === "final" ? trial.initialAnswer : null),
+  );
+  const [confidence, setConfidence] = useState<number | null>(prefill?.confidence ?? null);
   const timer = useVisibleTimer();
   const heading = useRef<HTMLHeadingElement>(null);
 
@@ -53,7 +57,7 @@ export function TrialStep({ trial, phase, number, total, assisted, busy, error, 
   const ready = answer !== null && confidence !== null;
   const last = number === total;
   const willSeeAi = assisted && phase === "own" && !trial.isCatch;
-  const button = willSeeAi ? "Lock in and see the AI" : last ? "Finish" : "Next headline";
+  const button = prefill ? "Save the change" : willSeeAi ? "Lock in and see the AI" : last ? "Finish" : "Next headline";
 
   return (
     <div className="trial">
@@ -69,6 +73,11 @@ export function TrialStep({ trial, phase, number, total, assisted, busy, error, 
         </div>
       </div>
 
+      {prefill && (
+        <p className="notice" role="note">
+          You are changing your answer to headline {number}. Save within the time shown, or it stays as it was.
+        </p>
+      )}
       {phase === "final" && trial.ai ? (
         <>
           <p className="recap">

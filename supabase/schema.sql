@@ -54,6 +54,11 @@ create table if not exists public.trials (
   unique (session_id, position)
 );
 
+-- Version 2 (2026-11-11): the 10-second go-back window and the interface version.
+alter table public.sessions add column if not exists app_version text;
+alter table public.trials add column if not exists initial_revisions int not null default 0;
+alter table public.trials add column if not exists final_revisions int not null default 0;
+
 create index if not exists trials_item_idx on public.trials (item_id);
 create index if not exists sessions_code_idx on public.sessions (code);
 

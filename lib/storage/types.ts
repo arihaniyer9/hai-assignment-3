@@ -22,12 +22,14 @@ export type TrialPatch = Partial<{
   initialConfidence: number;
   initialTimeMs: number;
   initialAt: string;
+  initialRevisions: number;
   ai: AiOutput;
   aiShownAt: string;
   finalAnswer: Answer;
   finalConfidence: number;
   finalTimeMs: number;
   finalAt: string;
+  finalRevisions: number;
 }>;
 
 export type CreateSessionResult = "ok" | "id_taken" | "code_taken";
@@ -47,8 +49,11 @@ export interface Storage {
     code: string;
     condition: Condition;
     consentedAt: string;
+    appVersion: string;
   }): Promise<CreateSessionResult>;
   getSession(id: string): Promise<SessionRecord | null>;
+  /** Every session with this code (any condition, including terminated ones). */
+  sessionsForCode(code: string): Promise<SessionRecord[]>;
   /** The code's session in this condition that was not terminated, if any. */
   findOpenSession(code: string, condition: Condition): Promise<SessionRecord | null>;
   updateSession(id: string, patch: SessionPatch): Promise<void>;

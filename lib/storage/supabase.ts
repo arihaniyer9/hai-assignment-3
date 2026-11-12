@@ -24,6 +24,7 @@ interface SessionRow {
   terminated_at: string | null;
   completed_at: string | null;
   comment: string | null;
+  app_version: string | null;
 }
 
 interface TrialRow {
@@ -34,18 +35,21 @@ interface TrialRow {
   initial_confidence: number | null;
   initial_time_ms: number | null;
   initial_at: string | null;
+  initial_revisions: number;
   ai_json: AiOutput | null;
   ai_shown_at: string | null;
   final_answer: Answer | null;
   final_confidence: number | null;
   final_time_ms: number | null;
   final_at: string | null;
+  final_revisions: number;
   items: { headline: string; label: Answer; type: string };
 }
 
 const TRIAL_FIELDS =
   "session_id, item_id, position, initial_answer, initial_confidence, initial_time_ms, initial_at, " +
-  "ai_json, ai_shown_at, final_answer, final_confidence, final_time_ms, final_at, " +
+  "initial_revisions, ai_json, ai_shown_at, final_answer, final_confidence, final_time_ms, final_at, " +
+  "final_revisions, " +
   "items!inner(headline, label, type)";
 
 const toSession = (r: SessionRow): SessionRecord => ({
@@ -58,6 +62,7 @@ const toSession = (r: SessionRow): SessionRecord => ({
   terminatedAt: r.terminated_at,
   completedAt: r.completed_at,
   comment: r.comment,
+  appVersion: r.app_version,
 });
 
 const toTrial = (r: TrialRow): TrialRecord => ({
@@ -71,12 +76,14 @@ const toTrial = (r: TrialRow): TrialRecord => ({
   initialConfidence: r.initial_confidence,
   initialTimeMs: r.initial_time_ms,
   initialAt: r.initial_at,
+  initialRevisions: r.initial_revisions,
   ai: r.ai_json,
   aiShownAt: r.ai_shown_at,
   finalAnswer: r.final_answer,
   finalConfidence: r.final_confidence,
   finalTimeMs: r.final_time_ms,
   finalAt: r.final_at,
+  finalRevisions: r.final_revisions,
 });
 
 const SESSION_COLUMNS: Record<keyof SessionPatch, string> = {
@@ -91,12 +98,14 @@ const TRIAL_COLUMNS: Record<keyof TrialPatch, string> = {
   initialConfidence: "initial_confidence",
   initialTimeMs: "initial_time_ms",
   initialAt: "initial_at",
+  initialRevisions: "initial_revisions",
   ai: "ai_json",
   aiShownAt: "ai_shown_at",
   finalAnswer: "final_answer",
   finalConfidence: "final_confidence",
   finalTimeMs: "final_time_ms",
   finalAt: "final_at",
+  finalRevisions: "final_revisions",
 };
 
 function columns(map: Record<string, string>, patch: object): Record<string, unknown> {
@@ -145,10 +154,10 @@ export function createSupabaseStorage(url: string, serviceRoleKey: string): Stor
       );
     },
 
-    async createSession({ id, code, condition, consentedAt }) {
+    async createSession({ id, code, condition, consentedAt, appVersion }) {
       const { error } = await sb
         .from("sessions")
-        .insert({ id, code, condition, consented_at: consentedAt });
+        .insert({ id, code, condition, consented_at: consentedAt, app_version: appVersion });
       if (!error) return "ok";
       if (error.code === "23505") {
         // unique_violation: which constraint tells us whether the id or the open code clashed
@@ -160,6 +169,13 @@ export function createSupabaseStorage(url: string, serviceRoleKey: string): Stor
     async getSession(id) {
       const row = unwrap(await sb.from("sessions").select("*").eq("id", id).maybeSingle()) as SessionRow | null;
       return row ? toSession(row) : null;
+    },
+
+    async sessionsForCode(code) {
+      const rows = unwrap(
+        await sb.from("sessions").select("*").eq("code", code).order("consented_at").order("id"),
+      ) as SessionRow[];
+      return rows.map(toSession);
     },
 
     async findOpenSession(code, condition) {

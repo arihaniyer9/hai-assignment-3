@@ -32,7 +32,8 @@ const SCHEMA = `
     check_passed_at TEXT,
     terminated_at TEXT,
     completed_at TEXT,
-    comment TEXT
+    comment TEXT,
+    app_version TEXT
   );
   CREATE UNIQUE INDEX IF NOT EXISTS sessions_open_code
     ON sessions (code, condition) WHERE terminated_at IS NULL;
@@ -44,12 +45,14 @@ const SCHEMA = `
     initial_confidence INTEGER CHECK (initial_confidence BETWEEN 1 AND 5),
     initial_time_ms INTEGER CHECK (initial_time_ms >= 0),
     initial_at TEXT,
+    initial_revisions INTEGER NOT NULL DEFAULT 0,
     ai_json TEXT,
     ai_shown_at TEXT,
     final_answer TEXT CHECK (final_answer IN ('Satire','Real')),
     final_confidence INTEGER CHECK (final_confidence BETWEEN 1 AND 5),
     final_time_ms INTEGER CHECK (final_time_ms >= 0),
     final_at TEXT,
+    final_revisions INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (session_id, item_id),
     UNIQUE (session_id, position)
   );
@@ -65,6 +68,7 @@ interface SessionRow {
   terminated_at: string | null;
   completed_at: string | null;
   comment: string | null;
+  app_version: string | null;
 }
 
 interface TrialRow {
@@ -78,12 +82,14 @@ interface TrialRow {
   initial_confidence: number | null;
   initial_time_ms: number | null;
   initial_at: string | null;
+  initial_revisions: number;
   ai_json: string | null;
   ai_shown_at: string | null;
   final_answer: Answer | null;
   final_confidence: number | null;
   final_time_ms: number | null;
   final_at: string | null;
+  final_revisions: number;
 }
 
 const toSession = (r: SessionRow): SessionRecord => ({
@@ -96,6 +102,7 @@ const toSession = (r: SessionRow): SessionRecord => ({
   terminatedAt: r.terminated_at,
   completedAt: r.completed_at,
   comment: r.comment,
+  appVersion: r.app_version,
 });
 
 const toTrial = (r: TrialRow): TrialRecord => ({
@@ -109,12 +116,14 @@ const toTrial = (r: TrialRow): TrialRecord => ({
   initialConfidence: r.initial_confidence,
   initialTimeMs: r.initial_time_ms,
   initialAt: r.initial_at,
+  initialRevisions: r.initial_revisions,
   ai: r.ai_json ? (JSON.parse(r.ai_json) as AiOutput) : null,
   aiShownAt: r.ai_shown_at,
   finalAnswer: r.final_answer,
   finalConfidence: r.final_confidence,
   finalTimeMs: r.final_time_ms,
   finalAt: r.final_at,
+  finalRevisions: r.final_revisions,
 });
 
 /** Column names for each patchable field (the only identifiers ever interpolated into SQL). */
@@ -130,18 +139,21 @@ const TRIAL_COLUMNS: Record<keyof TrialPatch, string> = {
   initialConfidence: "initial_confidence",
   initialTimeMs: "initial_time_ms",
   initialAt: "initial_at",
+  initialRevisions: "initial_revisions",
   ai: "ai_json",
   aiShownAt: "ai_shown_at",
   finalAnswer: "final_answer",
   finalConfidence: "final_confidence",
   finalTimeMs: "final_time_ms",
   finalAt: "final_at",
+  finalRevisions: "final_revisions",
 };
 
 const TRIAL_SELECT = `
   SELECT t.session_id, t.item_id, t.position, i.headline, i.label, i.type,
-         t.initial_answer, t.initial_confidence, t.initial_time_ms, t.initial_at,
-         t.ai_json, t.ai_shown_at, t.final_answer, t.final_confidence, t.final_time_ms, t.final_at
+         t.initial_answer, t.initial_confidence, t.initial_time_ms, t.initial_at, t.initial_revisions,
+         t.ai_json, t.ai_shown_at, t.final_answer, t.final_confidence, t.final_time_ms, t.final_at,
+         t.final_revisions
   FROM trials t JOIN items i ON i.id = t.item_id`;
 
 /**
@@ -191,11 +203,11 @@ export function createSqliteStorage(file: string): Storage {
         .all() as unknown as ItemSeed[];
     },
 
-    async createSession({ id, code, condition, consentedAt }) {
+    async createSession({ id, code, condition, consentedAt, appVersion }) {
       try {
         db.prepare(
-          "INSERT INTO sessions (id, code, condition, consented_at) VALUES (?, ?, ?, ?)",
-        ).run(id, code, condition, consentedAt);
+          "INSERT INTO sessions (id, code, condition, consented_at, app_version) VALUES (?, ?, ?, ?, ?)",
+        ).run(id, code, condition, consentedAt, appVersion);
         return "ok";
       } catch (err) {
         const message = err instanceof Error ? err.message : "";
@@ -208,6 +220,13 @@ export function createSqliteStorage(file: string): Storage {
     async getSession(id) {
       const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as SessionRow | undefined;
       return row ? toSession(row) : null;
+    },
+
+    async sessionsForCode(code) {
+      const rows = db
+        .prepare("SELECT * FROM sessions WHERE code = ? ORDER BY consented_at, id")
+        .all(code) as unknown as SessionRow[];
+      return rows.map(toSession);
     },
 
     async findOpenSession(code, condition) {

@@ -1276,3 +1276,16 @@ table.data tr:last-child td {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
+
+/* Go-back bar: shown for 10 seconds after an answer that may still be changed. */
+.undo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}

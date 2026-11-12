@@ -1,0 +1,15 @@
+/** app/results/page.tsx: a participant's results for both parts (unlocked after both). */
+import type { Metadata } from "next";
+import { ResultsView } from "@/components/ResultsView";
+
+export const metadata: Metadata = { title: "Your results", robots: { index: false, follow: false } };
+
+export default async function ResultsPage(props: PageProps<"/results">) {
+  const raw = (await props.searchParams).code;
+  const code = (typeof raw === "string" ? raw : "").trim().toLowerCase();
+  return (
+    <div className="container container--wide">
+      <ResultsView initialCode={code} />
+    </div>
+  );
+}

@@ -69,6 +69,8 @@ export interface SessionRecord {
   terminatedAt: string | null;
   completedAt: string | null;
   comment: string | null;
+  /** Interface version the session started on (null = version 1). */
+  appVersion: string | null;
 }
 
 /** A stored trial (server side), including the item's answer key. */
@@ -83,12 +85,15 @@ export interface TrialRecord {
   initialConfidence: number | null;
   initialTimeMs: number | null;
   initialAt: string | null;
+  /** Times the answer was changed within the go-back window. */
+  initialRevisions: number;
   ai: AiOutput | null;
   aiShownAt: string | null;
   finalAnswer: Answer | null;
   finalConfidence: number | null;
   finalTimeMs: number | null;
   finalAt: string | null;
+  finalRevisions: number;
 }
 
 /** The end-of-session summary shown to the participant. */
@@ -97,6 +102,38 @@ export interface DebriefSummary {
   code: string;
   correct: number;
   total: number;
+}
+
+/** One headline on the participant's results page (only after both parts are finished). */
+export interface ResultRow {
+  position: number;
+  headline: string;
+  correctAnswer: Answer;
+  /** The answer that counts (final answer in the AI part). */
+  yourAnswer: Answer;
+  yourCorrect: boolean;
+  /** AI part only: the answer given before seeing the AI. */
+  firstAnswer: Answer | null;
+  /** What the AI said (AI part, as shown) or would have said (baseline part, never shown). */
+  aiAnswer: Answer;
+  aiConfidence: number;
+  aiCorrect: boolean;
+}
+
+export interface PartResults {
+  condition: Condition;
+  yourCorrect: number;
+  aiCorrect: number;
+  total: number;
+  rows: ResultRow[];
+  /** AI part only: how the AI changed answers. */
+  switchedToRight: number | null;
+  switchedToWrong: number | null;
+}
+
+export interface ParticipantResults {
+  code: string;
+  parts: PartResults[];
 }
 
 /** Admin dashboard numbers. */

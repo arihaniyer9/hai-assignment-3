@@ -13,12 +13,26 @@
  *   - trials are answered strictly in order;
  *   - in the assisted condition the AI is shown only after the participant's own answer is saved,
  *     and that answer can never change afterwards; the final answer needs the AI to have been shown;
- *   - every answer is write-once (a retry with the same values is accepted, a different one is not);
+ *   - an answer can be changed only within UNDO_WINDOW_MS of saving it (plus UNDO_GRACE_MS for network
+ *     delay), only before the next headline is answered, and never the participant's own answer on
+ *     an assisted trial (the AI has been seen by then); each change is counted. Otherwise answers are
+ *     write-once (a retry with the same values is accepted);
+ *   - the results page (every headline, the correct answer, the AI's answer) unlocks only when the
+ *     code has finished BOTH conditions, so nothing learned there can affect the other condition;
  *   - the AI output is computed live, logged once, and the same logged output is returned on reload;
  *   - ground truth never leaves the server before completion, and then only as a score.
  */
 import { aiFor } from "./ai";
-import { CATCH_ITEM_ID, MAX_CHECK_FAILURES, type Answer, type Condition } from "./constants";
+import {
+  APP_VERSION,
+  CATCH_ITEM_ID,
+  CONDITIONS,
+  MAX_CHECK_FAILURES,
+  UNDO_GRACE_MS,
+  UNDO_WINDOW_MS,
+  type Answer,
+  type Condition,
+} from "./constants";
 import { scoredAnswer } from "./export";
 import { generateSessionId } from "./ids";
 import { CHECK_ANSWER } from "./instructions";
@@ -28,6 +42,8 @@ import type { Storage } from "./storage/types";
 import type {
   AiOutput,
   DebriefSummary,
+  ParticipantResults,
+  PartResults,
   SessionRecord,
   SessionState,
   SessionStatus,
@@ -130,7 +146,13 @@ export async function startSession(input: StartInput, storage?: Storage): Promis
       return stateOf(store, open);
     }
     const id = generateSessionId();
-    const result = await store.createSession({ id, code: input.code, condition: input.condition, consentedAt: now() });
+    const result = await store.createSession({
+      id,
+      code: input.code,
+      condition: input.condition,
+      consentedAt: now(),
+      appVersion: APP_VERSION,
+    });
     if (result === "ok") return stateOf(store, await requireSession(store, id));
     // "code_taken": another tab created it a moment ago; loop and resume it. "id_taken": draw again.
   }
@@ -183,7 +205,7 @@ async function requireCurrentTrial(
   store: Storage,
   id: string,
   itemId: string,
-): Promise<{ s: SessionRecord; trial: TrialRecord }> {
+): Promise<{ s: SessionRecord; trial: TrialRecord; trials: TrialRecord[] }> {
   const s = await requireSession(store, id);
   if (statusOf(s) !== "trials") throw new ServiceError("conflict", "This session is not taking answers.");
   const trials = await store.listTrials(id);
@@ -192,7 +214,21 @@ async function requireCurrentTrial(
   if (trials.some((t) => t.position < trial.position && !trialDone(s, t))) {
     throw new ServiceError("invalid", "Please answer the headlines in order.");
   }
-  return { s, trial };
+  return { s, trial, trials };
+}
+
+/**
+ * Throws unless a saved answer may still be changed: within the go-back window of when it was
+ * first saved, and before any later headline has been answered.
+ */
+function requireRevisable(trials: TrialRecord[], trial: TrialRecord, savedAt: string | null): void {
+  const age = Date.now() - Date.parse(savedAt ?? "");
+  if (!(age <= UNDO_WINDOW_MS + UNDO_GRACE_MS)) {
+    throw new ServiceError("conflict", "The 10 seconds to change this answer have passed.");
+  }
+  if (trials.some((t) => t.position > trial.position && t.initialAnswer !== null)) {
+    throw new ServiceError("conflict", "You have already answered the next headline.");
+  }
 }
 
 function sameAnswer(a: Answer | null, c: number | null, input: AnswerInput): boolean {
@@ -202,10 +238,21 @@ function sameAnswer(a: Answer | null, c: number | null, input: AnswerInput): boo
 /** Saves the participant's own answer (the only answer in the baseline condition). */
 export async function saveInitial(id: string, input: AnswerInput, storage?: Storage): Promise<void> {
   const store = storage ?? (await getStorage());
-  const { trial } = await requireCurrentTrial(store, id, input.itemId);
+  const { s, trial, trials } = await requireCurrentTrial(store, id, input.itemId);
   if (trial.initialAnswer !== null) {
     if (sameAnswer(trial.initialAnswer, trial.initialConfidence, input)) return; // retry
-    throw new ServiceError("conflict", "This answer has already been saved.");
+    if (needsFinal(s, trial)) {
+      // On an assisted trial the AI is shown as soon as the own answer is saved.
+      throw new ServiceError("conflict", "Your own answer cannot be changed once the AI has been shown.");
+    }
+    requireRevisable(trials, trial, trial.initialAt);
+    await store.updateTrial(id, input.itemId, {
+      initialAnswer: input.answer,
+      initialConfidence: input.confidence,
+      initialTimeMs: (trial.initialTimeMs ?? 0) + input.timeMs,
+      initialRevisions: trial.initialRevisions + 1,
+    });
+    return;
   }
   await store.updateTrial(id, input.itemId, {
     initialAnswer: input.answer,
@@ -235,12 +282,19 @@ export async function showAi(id: string, itemId: string, storage?: Storage): Pro
 /** Saves the answer given after seeing the AI (assisted condition). */
 export async function saveFinal(id: string, input: AnswerInput, storage?: Storage): Promise<void> {
   const store = storage ?? (await getStorage());
-  const { s, trial } = await requireCurrentTrial(store, id, input.itemId);
+  const { s, trial, trials } = await requireCurrentTrial(store, id, input.itemId);
   if (!needsFinal(s, trial)) throw new ServiceError("forbidden", "This item has no second answer.");
   if (!trial.ai) throw new ServiceError("invalid", "Please look at the AI's suggestion first.");
   if (trial.finalAnswer !== null) {
     if (sameAnswer(trial.finalAnswer, trial.finalConfidence, input)) return; // retry
-    throw new ServiceError("conflict", "This answer has already been saved.");
+    requireRevisable(trials, trial, trial.finalAt);
+    await store.updateTrial(id, input.itemId, {
+      finalAnswer: input.answer,
+      finalConfidence: input.confidence,
+      finalTimeMs: (trial.finalTimeMs ?? 0) + input.timeMs,
+      finalRevisions: trial.finalRevisions + 1,
+    });
+    return;
   }
   await store.updateTrial(id, input.itemId, {
     finalAnswer: input.answer,
@@ -293,4 +347,48 @@ export async function getSummary(id: string, storage?: Storage): Promise<Debrief
   const s = await requireSession(store, id);
   if (!s.completedAt) throw new ServiceError("forbidden", "Your score is available when you finish.");
   return summarise(s, await store.listTrials(id));
+}
+
+/**
+ * Every headline of both parts with the participant's answer, the correct answer and the AI's
+ * answer: as shown in the AI part, and as it would have been (never shown) in the baseline part.
+ *
+ * @throws ServiceError `forbidden` unless this code has finished both conditions.
+ */
+export async function getResults(code: string, storage?: Storage): Promise<ParticipantResults> {
+  const store = storage ?? (await getStorage());
+  const done = (await store.sessionsForCode(code)).filter((s) => s.completedAt && !s.terminatedAt);
+  if (!CONDITIONS.every((c) => done.some((s) => s.condition === c))) {
+    throw new ServiceError("forbidden", "Your results unlock once you have finished both parts with this code.");
+  }
+  const parts: PartResults[] = [];
+  for (const s of done) {
+    const trials = (await store.listTrials(s.id)).filter((t) => !isCatch(t));
+    const rows = trials.map((t) => {
+      const ai = t.ai ?? aiFor(t.headline);
+      const yours = scoredAnswer(s.condition, t)!;
+      return {
+        position: t.position,
+        headline: t.headline,
+        correctAnswer: t.label,
+        yourAnswer: yours,
+        yourCorrect: yours === t.label,
+        firstAnswer: s.condition === "assisted" ? t.initialAnswer : null,
+        aiAnswer: ai.label,
+        aiConfidence: ai.confidence,
+        aiCorrect: ai.label === t.label,
+      };
+    });
+    const switched = s.condition === "assisted" ? trials.filter((t) => t.finalAnswer !== t.initialAnswer) : null;
+    parts.push({
+      condition: s.condition,
+      yourCorrect: rows.filter((r) => r.yourCorrect).length,
+      aiCorrect: rows.filter((r) => r.aiCorrect).length,
+      total: rows.length,
+      rows,
+      switchedToRight: switched ? switched.filter((t) => t.finalAnswer === t.label).length : null,
+      switchedToWrong: switched ? switched.filter((t) => t.finalAnswer !== t.label).length : null,
+    });
+  }
+  return { code, parts };
 }

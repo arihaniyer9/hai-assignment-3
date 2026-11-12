@@ -2,7 +2,7 @@
  * tests/service.test.ts — the study rules, against a throwaway in-memory SQLite database through
  * the same Storage interface Supabase implements.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { aiFor } from "../lib/ai";
 import { CATCH_ITEM_ID, ITEM_TYPES, STUDY_TRIALS, TRIALS_PER_TYPE, type Condition } from "../lib/constants";
 import { CHECK_ANSWER } from "../lib/instructions";
@@ -10,6 +10,7 @@ import { loadItemSeeds } from "../lib/items";
 import {
   answerCheck,
   completeSession,
+  getResults,
   getSessionState,
   getSummary,
   saveFinal,
@@ -94,10 +95,10 @@ describe("starting and resuming", () => {
   });
 
   it("the database refuses a second open session for a code, even if the service is bypassed", async () => {
-    await store.createSession({ id: "S-AAAAAA", code: "x-y-z", condition: "baseline", consentedAt: "t" });
-    const again = await store.createSession({ id: "S-BBBBBB", code: "x-y-z", condition: "baseline", consentedAt: "t" });
+    await store.createSession({ id: "S-AAAAAA", code: "x-y-z", condition: "baseline", consentedAt: "t", appVersion: "2" });
+    const again = await store.createSession({ id: "S-BBBBBB", code: "x-y-z", condition: "baseline", consentedAt: "t", appVersion: "2" });
     expect(again).toBe("code_taken");
-    const sameId = await store.createSession({ id: "S-AAAAAA", code: "other", condition: "baseline", consentedAt: "t" });
+    const sameId = await store.createSession({ id: "S-AAAAAA", code: "other", condition: "baseline", consentedAt: "t", appVersion: "2" });
     expect(sameId).toBe("id_taken");
   });
 });
@@ -157,9 +158,10 @@ describe("baseline trials", () => {
     expect((await failure(() => saveInitial(s.sessionId, ans(t2.itemId), store))).code).toBe("invalid");
     await saveInitial(s.sessionId, ans(t1.itemId, "Real", 4), store);
     await saveInitial(s.sessionId, ans(t1.itemId, "Real", 4), store); // a retry is fine
+    await saveInitial(s.sessionId, ans(t2.itemId), store); // now in order
+    // once the next headline is answered, the earlier answer is final
     const changed = await failure(() => saveInitial(s.sessionId, ans(t1.itemId, "Satire", 4), store));
     expect(changed.code).toBe("conflict");
-    await saveInitial(s.sessionId, ans(t2.itemId), store); // now in order
     const state = await getSessionState(s.sessionId, store);
     expect(state.trials[0]).toMatchObject({ initialAnswer: "Real", initialConfidence: 4 });
   });
@@ -223,9 +225,9 @@ describe("assisted trials", () => {
     expect((await failure(() => saveInitial(s.sessionId, ans(t2.itemId), store))).code).toBe("invalid");
     await showAi(s.sessionId, t1.itemId, store);
     await saveFinal(s.sessionId, ans(t1.itemId, "Satire", 5), store);
+    await saveInitial(s.sessionId, ans(t2.itemId), store);
     const changed = await failure(() => saveFinal(s.sessionId, ans(t1.itemId, "Real", 5), store));
     expect(changed.code).toBe("conflict");
-    await saveInitial(s.sessionId, ans(t2.itemId), store);
     expect((await getSessionState(s.sessionId, store)).trials[0]).toMatchObject({
       initialAnswer: "Real",
       finalAnswer: "Satire",
@@ -304,5 +306,113 @@ describe("privacy", () => {
       expect(Object.keys(t)).not.toContain("type");
     }
     expect(JSON.stringify(state)).not.toMatch(/"(type|topic|source)"/);
+  });
+});
+
+describe("go-back window (10 s)", () => {
+  afterEach(() => vi.useRealTimers());
+  const at = (ms: number) => vi.setSystemTime(new Date(Date.UTC(2026, 10, 12, 10, 0, 0) + ms));
+
+  it("a baseline answer can be changed within the window; each change is counted and times add up", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    at(0);
+    const s = await started("baseline");
+    const t = s.trials[0];
+    await saveInitial(s.sessionId, { ...ans(t.itemId, "Real", 2), timeMs: 3000 }, store);
+    at(4_000);
+    await saveInitial(s.sessionId, { ...ans(t.itemId, "Satire", 4), timeMs: 1500 }, store);
+    at(9_000);
+    await saveInitial(s.sessionId, { ...ans(t.itemId, "Real", 5), timeMs: 500 }, store);
+    const [saved] = await store.listTrials(s.sessionId);
+    expect(saved).toMatchObject({ initialAnswer: "Real", initialConfidence: 5, initialTimeMs: 5000, initialRevisions: 2 });
+  });
+
+  it("the window is counted from the first save, with 5 s of grace, and then closes", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    at(0);
+    const s = await started("baseline");
+    const t = s.trials[0];
+    await saveInitial(s.sessionId, ans(t.itemId, "Real"), store);
+    at(14_000);
+    await saveInitial(s.sessionId, ans(t.itemId, "Satire"), store); // inside window + grace
+    at(15_001);
+    const late = await failure(() => saveInitial(s.sessionId, ans(t.itemId, "Real"), store));
+    expect(late.code).toBe("conflict");
+    expect(late.message).toMatch(/10 seconds/);
+  });
+
+  it("closes as soon as the next headline is answered", async () => {
+    const s = await started("baseline");
+    const [t1, t2] = s.trials;
+    await saveInitial(s.sessionId, ans(t1.itemId, "Real"), store);
+    await saveInitial(s.sessionId, ans(t2.itemId, "Real"), store);
+    const err = await failure(() => saveInitial(s.sessionId, ans(t1.itemId, "Satire"), store));
+    expect(err.message).toMatch(/next headline/);
+  });
+
+  it("never reopens the own answer on an assisted trial, even immediately", async () => {
+    const s = await started("assisted");
+    const t = s.trials[0];
+    await saveInitial(s.sessionId, ans(t.itemId, "Real"), store);
+    const err = await failure(() => saveInitial(s.sessionId, ans(t.itemId, "Satire"), store));
+    expect(err.message).toMatch(/AI has been shown/);
+  });
+
+  it("lets an assisted final answer be changed within the window, counted separately", async () => {
+    const s = await started("assisted");
+    const t = s.trials[0];
+    await saveInitial(s.sessionId, ans(t.itemId, "Real"), store);
+    await showAi(s.sessionId, t.itemId, store);
+    await saveFinal(s.sessionId, ans(t.itemId, "Real", 3), store);
+    await saveFinal(s.sessionId, ans(t.itemId, "Satire", 4), store);
+    const [saved] = await store.listTrials(s.sessionId);
+    expect(saved).toMatchObject({ initialAnswer: "Real", finalAnswer: "Satire", initialRevisions: 0, finalRevisions: 1 });
+  });
+
+  it("closes once the session is finished", async () => {
+    const s = await started("baseline");
+    await answerAll(s);
+    await completeSession(s.sessionId, null, store);
+    const last = s.trials.at(-1)!;
+    expect((await failure(() => saveInitial(s.sessionId, ans(last.itemId, "Satire", 1), store))).code).toBe("conflict");
+  });
+});
+
+describe("results page", () => {
+  it("stays locked until the code has finished both parts", async () => {
+    expect((await failure(() => getResults("nobody-1", store))).code).toBe("forbidden");
+    const a = await started("baseline");
+    await answerAll(a);
+    await completeSession(a.sessionId, null, store);
+    expect((await failure(() => getResults("blue-otter-7", store))).code).toBe("forbidden");
+    const b = await started("assisted");
+    await answerAll(b, (i) => i % 2 === 0);
+    expect((await failure(() => getResults("blue-otter-7", store))).code).toBe("forbidden"); // not finished
+  });
+
+  it("lists every study headline of both parts with the right answers and the AI's", async () => {
+    const a = await started("baseline");
+    await answerAll(a, (i) => i % 3 !== 0);
+    await completeSession(a.sessionId, null, store);
+    const b = await started("assisted");
+    await answerAll(b); // first answers all wrong, final answers all right
+    await completeSession(b.sessionId, null, store);
+
+    const results = await getResults("blue-otter-7", store);
+    expect(results.parts.map((p) => p.condition)).toEqual(["baseline", "assisted"]);
+    for (const part of results.parts) {
+      expect(part.total).toBe(STUDY_TRIALS);
+      expect(part.rows.some((r) => r.headline.startsWith("Attention Check"))).toBe(false);
+      expect(part.yourCorrect).toBe(part.rows.filter((r) => r.yourAnswer === r.correctAnswer).length);
+      expect(part.aiCorrect).toBe(part.rows.filter((r) => r.aiAnswer === r.correctAnswer).length);
+      for (const r of part.rows) expect(r.aiAnswer).toBe(aiFor(r.headline).label);
+    }
+    const [base, assisted] = results.parts;
+    expect(base.rows.every((r) => r.firstAnswer === null)).toBe(true);
+    expect(base.switchedToRight).toBeNull();
+    expect(assisted.yourCorrect).toBe(STUDY_TRIALS);
+    expect(assisted.switchedToRight).toBe(STUDY_TRIALS); // every final answer switched to the truth
+    expect(assisted.switchedToWrong).toBe(0);
+    expect(assisted.rows.every((r) => r.firstAnswer !== null && r.firstAnswer !== r.correctAnswer)).toBe(true);
   });
 });

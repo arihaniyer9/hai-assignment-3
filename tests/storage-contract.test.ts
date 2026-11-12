@@ -40,9 +40,9 @@ describe.each(backends)("storage contract: %s", (_name, make) => {
     const id = `S-${tag.toUpperCase().replace(/[^A-Z2-9]/g, "A").slice(0, 6).padEnd(6, "A")}`;
     const code = `contract-${tag}`;
 
-    expect(await store.createSession({ id, code, condition: "assisted", consentedAt: new Date().toISOString() })).toBe("ok");
-    expect(await store.createSession({ id: `${id.slice(0, -1)}Z`, code, condition: "assisted", consentedAt: "2026-01-01T00:00:00Z" })).toBe("code_taken");
-    expect(await store.createSession({ id, code: `${code}-b`, condition: "assisted", consentedAt: "2026-01-01T00:00:00Z" })).toBe("id_taken");
+    expect(await store.createSession({ id, code, condition: "assisted", consentedAt: new Date().toISOString(), appVersion: "2" })).toBe("ok");
+    expect(await store.createSession({ id: `${id.slice(0, -1)}Z`, code, condition: "assisted", consentedAt: "2026-01-01T00:00:00Z", appVersion: "2" })).toBe("code_taken");
+    expect(await store.createSession({ id, code: `${code}-b`, condition: "assisted", consentedAt: "2026-01-01T00:00:00Z", appVersion: "2" })).toBe("id_taken");
     expect((await store.findOpenSession(code, "assisted"))?.id).toBe(id);
     expect(await store.findOpenSession(code, "baseline")).toBeNull();
 
@@ -76,7 +76,7 @@ describe.each(backends)("storage contract: %s", (_name, make) => {
     expect(s).toMatchObject({ code, condition: "assisted", checkFailures: 1, comment: "ok" });
     expect(s.terminatedAt).not.toBeNull();
     expect(await store.findOpenSession(code, "assisted")).toBeNull(); // terminated is not open
-    expect(await store.createSession({ id: `${id.slice(0, -1)}Y`, code, condition: "assisted", consentedAt: new Date().toISOString() })).toBe("ok");
+    expect(await store.createSession({ id: `${id.slice(0, -1)}Y`, code, condition: "assisted", consentedAt: new Date().toISOString(), appVersion: "2" })).toBe("ok");
 
     expect((await store.listAllSessions()).some((x) => x.id === id)).toBe(true);
     expect((await store.listAllTrials()).filter((t) => t.sessionId === id)).toHaveLength(3);

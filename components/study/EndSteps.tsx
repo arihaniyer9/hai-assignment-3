@@ -77,6 +77,11 @@ export function DoneStep({ summary }: { summary: DebriefSummary }) {
         {other.name} yet, please do it next with the <strong>same code</strong>:{" "}
         <Link href={other.path}>{other.name}</Link>.
       </p>
+      <p>
+        Once you have finished both parts, you can see every headline, the correct answers and how the AI
+        compared: <Link href={`/results?code=${encodeURIComponent(summary.code)}`}>see your results</Link>. The
+        page stays locked until both parts are done, so that seeing answers cannot affect the other part.
+      </p>
       <p className="muted small">
         Your answers are saved. You can close this page. Please do not share the headlines with classmates
         who have not taken part yet.

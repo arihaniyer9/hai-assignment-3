@@ -26,6 +26,7 @@ const session = (over: Partial<SessionRecord>): SessionRecord => ({
   terminatedAt: null,
   completedAt: "2026-11-12T10:05:00Z",
   comment: null,
+  appVersion: "2",
   ...over,
 });
 
@@ -48,12 +49,14 @@ const trial = (over: Partial<TrialRecord>): TrialRecord => ({
   initialConfidence: null,
   initialTimeMs: null,
   initialAt: null,
+  initialRevisions: 0,
   ai: null,
   aiShownAt: null,
   finalAnswer: null,
   finalConfidence: null,
   finalTimeMs: null,
   finalAt: null,
+  finalRevisions: 0,
   ...over,
 });
 

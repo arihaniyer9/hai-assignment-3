@@ -32,5 +32,17 @@ export const MAX_CHECK_FAILURES = 2;
 export const CONFIDENCE_MIN = 1;
 export const CONFIDENCE_MAX = 5;
 
+/**
+ * Interface version, stored with every session. Version 2 (deployed 2026-11-11, after the first
+ * participants) added the 10-second "go back" window and the results page. Earlier sessions have
+ * no stored version and are version 1.
+ */
+export const APP_VERSION = "2";
+
+/** How long after saving an answer it can still be changed (baseline and final answers only). */
+export const UNDO_WINDOW_MS = 10_000;
+/** Extra time the server allows on top of the visible window, for network delay. */
+export const UNDO_GRACE_MS = 5_000;
+
 /** Participant codes: lowercase letters, digits and hyphens, 3 to 24 characters. */
 export const CODE_RE = /^[a-z0-9][a-z0-9-]{2,23}$/;

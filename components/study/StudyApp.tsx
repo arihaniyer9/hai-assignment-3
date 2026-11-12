@@ -16,6 +16,18 @@ import { CheckStep } from "./CheckStep";
 import { DoneStep, FinishStep, TerminatedStep } from "./EndSteps";
 import { IntroStep } from "./IntroStep";
 import { TrialStep } from "./TrialStep";
+import { UndoBar } from "./UndoBar";
+import { UNDO_WINDOW_MS } from "@/lib/constants";
+
+/** A saved answer that may still be changed, and when the go-back window closes. */
+interface Undoable {
+  itemId: string;
+  phase: "own" | "final";
+  answer: Answer;
+  confidence: number;
+  number: number;
+  expiresAt: number;
+}
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : "Something went wrong.");
 
@@ -31,6 +43,12 @@ export function StudyApp({ condition }: { condition: Condition }) {
   const [summary, setSummary] = useState<DebriefSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [undo, setUndo] = useState<Undoable | null>(null);
+  const [revisit, setRevisit] = useState<Undoable | null>(null);
+  const clearUndo = useCallback(() => {
+    setUndo(null);
+    setRevisit(null);
+  }, []);
 
   // Resume this browser's session for this condition, if any.
   useEffect(() => {
@@ -141,19 +159,70 @@ export function StudyApp({ condition }: { condition: Condition }) {
     );
   }
 
-  if (!current) {
+  const bar =
+    undo && !revisit ? (
+      <UndoBar
+        expiresAt={undo.expiresAt}
+        number={undo.number}
+        onExpire={clearUndo}
+        onBack={() => {
+          setError(null);
+          setRevisit(undo);
+        }}
+      />
+    ) : null;
+
+  // Going back to change a saved answer (baseline answers and final answers only).
+  if (revisit) {
+    const trial = session.trials.find((t) => t.itemId === revisit.itemId)!;
     return (
-      <FinishStep
+      <TrialStep
+        key={`${trial.itemId}-${revisit.phase}-revisit`}
+        trial={trial}
+        phase={revisit.phase}
+        number={trial.position}
+        total={session.trials.length}
+        assisted={assisted}
         busy={busy}
         error={error}
-        onFinish={(comment) =>
+        prefill={{ answer: revisit.answer, confidence: revisit.confidence }}
+        onSubmit={(answer, confidence, timeMs) =>
           run(async () => {
-            const result = await api.complete(session.sessionId, comment);
-            setSummary(result);
-            setSession({ ...session, status: "done" });
+            const payload = { itemId: trial.itemId, answer, confidence, timeMs };
+            try {
+              if (revisit.phase === "own") {
+                await api.saveInitial(session.sessionId, payload);
+                updateTrial(trial.itemId, { initialAnswer: answer, initialConfidence: confidence });
+              } else {
+                await api.saveFinal(session.sessionId, payload);
+                updateTrial(trial.itemId, { finalAnswer: answer, finalConfidence: confidence });
+              }
+            } finally {
+              clearUndo(); // saved, or the window closed: either way, carry on
+            }
           })
         }
       />
+    );
+  }
+
+  if (!current) {
+    return (
+      <>
+        {bar}
+        <FinishStep
+          busy={busy}
+          error={error}
+          onFinish={(comment) =>
+            run(async () => {
+              const result = await api.complete(session.sessionId, comment);
+              clearUndo();
+              setSummary(result);
+              setSession({ ...session, status: "done" });
+            })
+          }
+        />
+      </>
     );
   }
 
@@ -180,6 +249,9 @@ export function StudyApp({ condition }: { condition: Condition }) {
   }
 
   const phase = assisted && !current.isCatch && current.ai ? "final" : "own";
+  // The own answer on an assisted study trial is locked by the AI that follows; everything else
+  // can be changed for UNDO_WINDOW_MS.
+  const revisable = !(assisted && !current.isCatch && phase === "own");
   const save = (answer: Answer, confidence: number, timeMs: number) =>
     run(async () => {
       const payload = { itemId: current.itemId, answer, confidence, timeMs };
@@ -190,19 +262,27 @@ export function StudyApp({ condition }: { condition: Condition }) {
         await api.saveFinal(session.sessionId, payload);
         updateTrial(current.itemId, { finalAnswer: answer, finalConfidence: confidence });
       }
+      setUndo(
+        revisable
+          ? { itemId: current.itemId, phase, answer, confidence, number: current.position, expiresAt: Date.now() + UNDO_WINDOW_MS }
+          : null,
+      );
     });
 
   return (
-    <TrialStep
-      key={`${current.itemId}-${phase}`}
-      trial={current}
-      phase={phase}
-      number={current.position}
-      total={session.trials.length}
-      assisted={assisted}
-      busy={busy}
-      error={error}
-      onSubmit={save}
-    />
+    <>
+      {bar}
+      <TrialStep
+        key={`${current.itemId}-${phase}`}
+        trial={current}
+        phase={phase}
+        number={current.position}
+        total={session.trials.length}
+        assisted={assisted}
+        busy={busy}
+        error={error}
+        onSubmit={save}
+      />
+    </>
   );
 }

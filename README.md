@@ -34,7 +34,9 @@ Code for Human-AI Interaction Assignment 3 (FA26). In Assignment 2 I designed a 
    3. The participant gives a final answer (pre-filled with their own) and a new confidence.
 
    The first answer cannot be changed once the AI has been seen. The server enforces this, not just the page.
-5. **Optional comment, then the score.** Only the total score is shown, so the participant learns no answers that could help in the other condition.
+5. **Go back within 10 seconds.** After a baseline answer, an assisted final answer or the attention check, the next screen offers "Go back and change it" for 10 seconds. The server enforces the window, with 5 s of grace for network delay. The window closes early if the next headline is answered, and every change is counted. It is never offered for an assisted participant's own answer, because the AI is shown immediately after it.
+6. **Optional comment, then the score.** Only the total score is shown at this point.
+7. **Results after both parts.** Once a code has finished both conditions, `/results` lists every headline with the participant's answer and the correct answer. For the AI part it also shows their first answer and what the AI said; for the part on their own, what the AI would have said. It adds both scores and how often the AI changed their answer, for better or worse. It stays locked until both parts are done, so it cannot teach a participant before their second part.
 
 A refresh resumes at the same step, and an AI output that was already shown comes back exactly as logged.
 
@@ -48,7 +50,8 @@ A refresh resumes at the same step, and an AI output that was already shown come
 | Trials | 20 per condition (5 per type) + 1 attention check | 12 or 30 | About 5 minutes per link, under the 10-minute limit for both together |
 | Pairing | A self-chosen code, normalised to lower case | Names; no pairing | Two people could pick the same code; the second is refused for a part already finished |
 | Final-answer pre-fill | The answer is pre-filled with the person's own answer; confidence must be given again | Nothing pre-filled | Keeping one's answer takes one click less than changing it, as it would in real use |
-| Feedback | Only the total score at the end | Per-item answers | No learning between conditions |
+| Feedback | The total score after each part. Per-headline results (theirs, the truth, the AI's) only after both parts | Per-item answers after each part | Participants asked for it (two comments on 2026-11-08); gating keeps it from affecting the second part |
+| Changing an answer | A 10-second go-back window for baseline and final answers, counted in `*_revisions` | Write-once answers (version 1); a free Back button | Asked for by a participant. Bounded and logged, so accuracy can be reported with and without changed answers. Version 1 sessions had no window |
 | Attention checks | Instruction check (two tries) + one attention-check headline (recorded) | Terminating on a missed headline | The brief asks for tolerance; exclusion rules are pre-registered |
 | Storage | Supabase Postgres in production, SQLite for local work and tests | Survey platform (-10 points) | Two back ends, kept honest by a shared contract test |
 
@@ -99,9 +102,11 @@ Open http://localhost:3000/baseline and http://localhost:3000/assisted. Without 
 | Column | Meaning |
 |---|---|
 | `session_id`, `code`, `condition` | Who and which link |
+| `app_version` | Interface version: `1` before 2026-11-11 (no go-back window, no results page), `2` after |
 | `session_order` | 1 if this was the code's first condition, 2 if second (stopped attempts are not counted) |
 | `position`, `item_id`, `is_catch`, `item_type`, `headline`, `label` | The trial and its ground truth |
-| `initial_answer`, `initial_correct`, `initial_confidence`, `initial_time_ms`, `initial_at` | The participant's own answer (the only answer in the baseline) |
+| `initial_answer`, `initial_correct`, `initial_confidence`, `initial_time_ms`, `initial_at` | The participant's own answer (the only answer in the baseline); after a go-back change, the changed answer, with the time summed and `initial_at` the first save |
+| `initial_revisions`, `final_revisions` | How many times that answer was changed in the go-back window |
 | `ai_label`, `ai_prob_satire`, `ai_confidence`, `ai_confident`, `ai_correct`, `ai_words`, `ai_shown_at` | Exactly what the AI showed (assisted only); `ai_words` is `word:push` pairs, positive toward Satire |
 | `final_answer`, `final_correct`, `final_confidence`, `final_time_ms`, `final_at` | The answer after seeing the AI |
 | `switched` | The final answer differs from the own answer |
@@ -122,14 +127,14 @@ Times are visible-tab milliseconds, so switching tabs does not inflate them.
 
 ## 8. Testing
 
-Unit tests (Vitest, 95) cover:
+Unit tests (Vitest, 103) cover:
 - the model port (parity with Python on all 240 headlines and 14 edge cases);
 - the item pool, sampling and the attention-check placement;
 - every service rule and every input schema;
 - the exports;
 - the storage contract.
 
-I also removed each safeguard in turn (22 of them, from "answers are write-once" to the database's one-open-session index) and confirmed that a test fails each time.
+I also removed each safeguard in turn and confirmed that a test fails each time. That is 22 safeguards in the first version, from "answers are in order" to the database's one-open-session index, and 11 more for version 2: the window, its grace, the next-headline rule, the locked own answer, the revision counts and the results gate.
 
 Browser tests (Playwright, 21) cover:
 - both conditions end to end, with reloads;
