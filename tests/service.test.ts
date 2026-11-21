@@ -380,14 +380,14 @@ describe("go-back window (10 s)", () => {
 
 describe("results page", () => {
   it("stays locked until the code has finished both parts", async () => {
-    expect((await failure(() => getResults("nobody-1", store))).code).toBe("forbidden");
+    expect((await failure(() => getResults("S-AAAAAA", store))).code).toBe("not_found");
     const a = await started("baseline");
     await answerAll(a);
     await completeSession(a.sessionId, null, store);
-    expect((await failure(() => getResults("blue-otter-7", store))).code).toBe("forbidden");
+    expect((await failure(() => getResults(a.sessionId, store))).code).toBe("forbidden");
     const b = await started("assisted");
     await answerAll(b, (i) => i % 2 === 0);
-    expect((await failure(() => getResults("blue-otter-7", store))).code).toBe("forbidden"); // not finished
+    expect((await failure(() => getResults(b.sessionId, store))).code).toBe("forbidden"); // not finished
   });
 
   it("lists every study headline of both parts with the right answers and the AI's", async () => {
@@ -398,7 +398,9 @@ describe("results page", () => {
     await answerAll(b); // first answers all wrong, final answers all right
     await completeSession(b.sessionId, null, store);
 
-    const results = await getResults("blue-otter-7", store);
+    const results = await getResults(a.sessionId, store);
+    expect(await getResults(b.sessionId, store)).toEqual(results); // either session id works
+    expect(JSON.stringify(results)).not.toContain("blue-otter-7"); // the code is never returned
     expect(results.parts.map((p) => p.condition)).toEqual(["baseline", "assisted"]);
     for (const part of results.parts) {
       expect(part.total).toBe(STUDY_TRIALS);

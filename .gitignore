@@ -50,3 +50,13 @@ next-env.d.ts
 
 # end-to-end test build output
 /.next-e2e/
+
+# analysis virtual environment
+/analysis/.venv/
+
+# rendered report HTML (rebuilt from report/A3_report.md)
+/report/A3_report.html
+/dist/
+
+# raw exports with participant-chosen codes (some are uniqnames) and the code -> P# key; never committed
+/data/private/

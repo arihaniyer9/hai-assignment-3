@@ -180,6 +180,18 @@ test.describe.serial("participant flow", () => {
 });
 
 test.describe.serial("researcher", () => {
+  test("results cannot be looked up by a participant's code, only by their own session", async ({ browser, request }) => {
+    // the code-based lookup no longer exists
+    expect((await request.get("/api/results?code=otter-42")).status()).toBe(404);
+    // a fresh browser without the participant's session sees no results
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto("/results");
+    await expect(page.locator("main [role=alert]")).toContainText("browser you used");
+    await expect(page.locator("table")).toHaveCount(0);
+    await context.close();
+  });
+
   test("the admin data is refused without a valid login", async ({ page, request }) => {
     expect((await request.get("/api/admin/data")).status()).toBe(401);
     await page.goto("/admin");

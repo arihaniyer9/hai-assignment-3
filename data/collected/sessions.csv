@@ -1,0 +1,21 @@
+session_id,code,condition,app_version,session_order,consented_at,check_failures,check_passed_at,terminated_at,completed_at,catch_passed,study_trials_answered,study_trials_correct,accuracy,comment
+R1-baseline,R1,baseline,1,,2026-11-06T01:07:17.325+00:00,2,,2026-11-06T01:07:38.059+00:00,,,0,0,,
+R1-baseline-2,R1,baseline,1,,2026-11-06T01:07:49.81+00:00,2,,2026-11-06T01:07:56.735+00:00,,,0,0,,
+R1-baseline-3,R1,baseline,1,1.0,2026-11-06T01:08:06.707+00:00,0,2026-11-06T01:08:14.284+00:00,,2026-11-06T01:26:46.134+00:00,True,20,12,0.6,
+R1-assisted,R1,assisted,1,2.0,2026-11-06T01:27:00.357+00:00,0,2026-11-06T01:27:04.923+00:00,,2026-11-06T01:34:28.183+00:00,True,20,15,0.75,
+P1-baseline,P1,baseline,1,1.0,2026-11-09T01:38:44.338+00:00,0,2026-11-09T01:39:01.578+00:00,,2026-11-09T01:48:13.482+00:00,True,20,15,0.75,it was a fun exercise. I would really like a back button which gives the user 10 seconds to update their answer.
+P1-assisted,P1,assisted,1,2.0,2026-11-09T01:48:47.805+00:00,0,2026-11-09T01:48:51.899+00:00,,2026-11-09T02:05:40.057+00:00,True,20,16,0.8,"would have loved the questions that i got right or wrong for both sections. Also, hope to see how AI impacted/compared against my scores/options."
+P2-baseline,P2,baseline,1,1.0,2026-11-11T00:51:10.273+00:00,0,2026-11-11T00:51:22.758+00:00,,2026-11-11T00:55:20.062+00:00,True,20,16,0.8,I could be wrong on a lot of these
+P2-assisted,P2,assisted,1,2.0,2026-11-11T00:55:33.449+00:00,0,2026-11-11T00:55:38.037+00:00,,2026-11-11T01:01:51.253+00:00,True,20,13,0.65,No
+P3-assisted,P3,assisted,2,1.0,2026-11-12T15:48:00.212+00:00,0,2026-11-12T15:48:09.053+00:00,,2026-11-12T15:53:53.534+00:00,True,20,15,0.75,I would say the length of the task could be reduced as I think these were a bit easier to identify; I would suggest making the sentences a bit more complex or targeting a particular set of domains or scenarios.
+P4-assisted,P4,assisted,2,1.0,2026-11-12T16:07:06.626+00:00,0,2026-11-12T16:07:13.571+00:00,,2026-11-12T16:11:38.758+00:00,True,20,16,0.8,
+P5-assisted,P5,assisted,2,1.0,2026-11-12T16:07:55.024+00:00,1,2026-11-12T16:08:08.192+00:00,,2026-11-12T16:25:30.7+00:00,True,20,16,0.8,
+P6-baseline,P6,baseline,2,1.0,2026-11-12T16:17:42.404+00:00,0,2026-11-12T16:17:54.629+00:00,,2026-11-12T16:21:12.112+00:00,True,20,15,0.75,I found myself being more confident selecting what was satire than selecting what might have been real.
+P7-baseline,P7,baseline,2,1.0,2026-11-12T16:18:08.335+00:00,0,2026-11-12T16:18:20.71+00:00,,2026-11-12T16:21:50.404+00:00,True,20,20,1.0,
+P4-baseline,P4,baseline,2,2.0,2026-11-12T16:23:49.393+00:00,0,2026-11-12T16:23:52.719+00:00,,2026-11-12T16:26:44.861+00:00,True,20,17,0.85,
+P5-baseline,P5,baseline,2,2.0,2026-11-12T16:25:55.614+00:00,0,2026-11-12T16:26:01.282+00:00,,2026-11-12T16:30:20.13+00:00,True,20,13,0.65,
+P8-assisted,P8,assisted,2,1.0,2026-11-12T16:38:51.661+00:00,0,2026-11-12T16:39:02.328+00:00,,2026-11-12T16:43:55.219+00:00,True,20,17,0.85,
+P3-baseline,P3,baseline,2,2.0,2026-11-12T16:39:33.375+00:00,0,2026-11-12T16:39:37.235+00:00,,2026-11-12T16:42:29.119+00:00,True,20,17,0.85,
+P8-baseline,P8,baseline,2,2.0,2026-11-12T16:44:40.782+00:00,0,2026-11-12T16:44:44.405+00:00,,2026-11-12T16:47:19.187+00:00,True,20,12,0.6,
+P7-assisted,P7,assisted,2,2.0,2026-11-12T16:44:58.395+00:00,0,2026-11-12T16:45:01.328+00:00,,2026-11-12T16:51:03.597+00:00,True,20,18,0.9,
+P6-assisted,P6,assisted,2,2.0,2026-11-12T16:50:36.629+00:00,0,2026-11-12T16:50:41.824+00:00,,2026-11-12T16:56:07.36+00:00,True,20,17,0.85,"The AI suggestion often seemed wrong or uninformative. I also am realizing now when I was told to revaluate my answer I may have been able to change my selection or ""real"" or ""satire"" instead of just the confidence rating, but I'm not sure if that was an option."

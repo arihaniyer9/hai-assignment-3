@@ -63,9 +63,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               Headlines were collected from public satire and news websites for a Human-AI Interaction course
               project. The AI is a word-based model trained on a public headline dataset.
             </p>
-            <p>
-              <Link href="/admin">Researcher login</Link>
-            </p>
           </div>
         </footer>
       </body>

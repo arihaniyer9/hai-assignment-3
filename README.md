@@ -5,7 +5,7 @@ Code for Human-AI Interaction Assignment 3 (FA26). In Assignment 2 I designed a 
 - **`/baseline`**: the participant judges each headline on their own.
 - **`/assisted`**: the participant answers first, then sees the AI's live suggestion and gives a final answer.
 
-> **Status: work in progress.** The interfaces, live AI, data storage and tests are built. Deployment, the pre-registration, data collection and the analysis come next.
+> **Status: complete.** Data were collected (8 participants in the analysis, both conditions each), analysed in `analysis/`, and reported in `report/A3_report.pdf`.
 
 ## 1. Requirement map
 
@@ -20,7 +20,8 @@ Code for Human-AI Interaction Assignment 3 (FA26). In Assignment 2 I designed a 
 | Bonus: synchronous AI, outputs and interactions logged | The model runs on the server for every trial (`lib/ai.ts`, `POST /api/sessions/[id]/ai`); the exact output shown is stored with the trial, along with the answer before and after it |
 | Bonus: own interface | Built from scratch on my Assignment 1 app |
 | Data files with descriptions | Admin export `trials.csv` and `sessions.csv`; data dictionary in section 6 |
-| Analysis code that replicates the results | *(to come: `analysis/`)* |
+| Collected data files | `data/collected/trials.csv`, `data/collected/sessions.csv`, `data/collected/class_feedback.csv`. These are pseudonymized: codes are replaced by P1–P8 (R1 = my test run) and session ids by labels such as `P3-assisted`. The raw exports and the key stay in the gitignored `data/private/` (dictionary in section 6) |
+| Analysis code that replicates the results | `analysis/` (Python): `python -m a3.analyze` writes `analysis/results/`, `python -m a3.report` builds `report/A3_report.pdf` (section 9) |
 
 ## 2. How a session works
 
@@ -36,7 +37,7 @@ Code for Human-AI Interaction Assignment 3 (FA26). In Assignment 2 I designed a 
    The first answer cannot be changed once the AI has been seen. The server enforces this, not just the page.
 5. **Go back within 10 seconds.** After a baseline answer, an assisted final answer or the attention check, the next screen offers "Go back and change it" for 10 seconds. The server enforces the window, with 5 s of grace for network delay. The window closes early if the next headline is answered, and every change is counted. It is never offered for an assisted participant's own answer, because the AI is shown immediately after it.
 6. **Optional comment, then the score.** Only the total score is shown at this point.
-7. **Results after both parts.** Once a code has finished both conditions, `/results` lists every headline with the participant's answer and the correct answer. For the AI part it also shows their first answer and what the AI said; for the part on their own, what the AI would have said. It adds both scores and how often the AI changed their answer, for better or worse. It stays locked until both parts are done, so it cannot teach a participant before their second part.
+7. **Results after both parts.** Once a participant has finished both conditions, `/results` (opened from the thank-you screen, by session id, never by code) lists every headline with the participant's answer and the correct answer. For the AI part it also shows their first answer and what the AI said; for the part on their own, what the AI would have said. It adds both scores and how often the AI changed their answer, for better or worse. It stays locked until both parts are done, so it cannot teach a participant before their second part.
 
 A refresh resumes at the same step, and an AI output that was already shown comes back exactly as logged.
 
@@ -143,3 +144,42 @@ Browser tests (Playwright, 21) cover:
 - a phone run;
 - the admin login and exports;
 - no horizontal scrolling at five widths in light and dark.
+
+## 9. Analysis and report
+
+The analysis runs in its own Python environment (Python 3.13):
+
+```sh
+python3 -m venv analysis/.venv
+analysis/.venv/bin/pip install -r analysis/requirements-dev.txt
+cd analysis
+PYTHONPATH=src .venv/bin/python -m a3.analyze
+PYTHONPATH=src .venv/bin/python -m a3.report
+PYTHONPATH=src .venv/bin/pytest
+```
+
+- **`a3.data`** loads the two exports and defines each sample. Every rule that drops data is a named constant:
+  - only codes that finished both conditions and passed both attention checks;
+  - my own test code (`otter-92`) is excluded;
+  - the sensitivity samples are class-only, without previously seen headlines, and with the researcher included.
+- **`a3.metrics`** holds the measures and tests:
+  - per-participant accuracy, confidence and time;
+  - agreement and switch fractions (Yin et al., 2019), RAIR and RSR (Schemmer et al., 2023);
+  - Wilcoxon signed-rank with exact sign-flip permutation tests and rank-biserial r;
+  - an exact McNemar test;
+  - accuracy by type and by A2 error pattern;
+  - calibration and leave-one-out.
+- **`a3.analyze`** writes `analysis/results/results.json` and the figures. It also checks that the AI output logged in A3 matches the A2 model on every assisted trial.
+- **`a3.report`** fills every number in `report/A3_report.md` from `results.json`; an unknown placeholder or a missing image stops the build.
+    - It prints the PDF with headless Chrome; set `CHROME_PATH` if Chrome is elsewhere.
+    - It then measures where each heading landed (`src/a3/locate.swift`, macOS PDFKit) and reprints until every section starts on a new page unless about two-thirds of the page is free, and no subsection heading sits in the bottom 30% of a page.
+    - Without Swift it keeps Chrome's own layout.
+    - The report refers to participants as P1–P8, numbered by when they started.
+- **Tests:** 21, at 92% coverage.
+
+## 10. Privacy of the collected data
+
+Some participants used their uniqname as their code. To protect them:
+- **`a3.pseudonymize`** turns the raw admin exports in `data/private/` (gitignored) into the shared files in `data/collected/`. Codes become P1–P8 (R1 for my test run) and session ids become labels like `P3-assisted`. A test checks that no real code or session id remains.
+- **The results page** looks people up only by a session id, which only their own browser holds, and the response never contains the code.
+- **The admin login** delays every failed attempt by one second. The password lives only in `.env.local` and the Vercel settings, never in the repository.

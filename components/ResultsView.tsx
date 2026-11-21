@@ -9,7 +9,8 @@
  */
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
-import { CODE_RE } from "@/lib/constants";
+import { getStoredSessionId } from "@/lib/client-session";
+import { SESSION_ID_RE } from "@/lib/ids";
 import type { ParticipantResults, PartResults } from "@/lib/types";
 
 const TITLE = { baseline: "Part on your own", assisted: "Part with the AI" } as const;
@@ -74,78 +75,50 @@ function Part({ part }: { part: PartResults }) {
   );
 }
 
-export function ResultsView({ initialCode }: { initialCode: string }) {
-  const startCode = CODE_RE.test(initialCode) ? initialCode : "";
-  const [code, setCode] = useState(startCode);
+export function ResultsView({ initialSession }: { initialSession: string }) {
   const [results, setResults] = useState<ParticipantResults | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(startCode !== "");
+  const [loading, setLoading] = useState(true);
 
-  async function load(c: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      setResults(await api.results(c));
-    } catch (err) {
-      setResults(null);
-      setError(err instanceof Error ? err.message : "Could not load results.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // /results?code=otter-42 (the thank-you page links here) loads straight away.
+  // The session id comes from the thank-you page link, or from this browser's own stored sessions.
+  // Results are never looked up by code: some participants used their uniqname as their code.
   useEffect(() => {
-    if (!startCode) return;
+    const id =
+      (SESSION_ID_RE.test(initialSession) ? initialSession : null) ??
+      getStoredSessionId("assisted") ??
+      getStoredSessionId("baseline");
     let cancelled = false;
-    api
-      .results(startCode)
-      .then((r) => !cancelled && setResults(r))
-      .catch((err) => !cancelled && setError(err instanceof Error ? err.message : "Could not load results."))
-      .finally(() => !cancelled && setBusy(false));
+    if (!id) {
+      Promise.resolve().then(() => {
+        if (cancelled) return;
+        setError("Open this page from the thank-you screen, in the browser you used for the study.");
+        setLoading(false);
+      });
+    } else {
+      api
+        .results(id)
+        .then((r) => !cancelled && setResults(r))
+        .catch((err) => !cancelled && setError(err instanceof Error ? err.message : "Could not load results."))
+        .finally(() => !cancelled && setLoading(false));
+    }
     return () => {
       cancelled = true;
     };
-  }, [startCode]);
+  }, [initialSession]);
 
-  const normalised = code.trim().toLowerCase();
   return (
     <>
       <h1>Your results</h1>
       <p className="lede">
         Every headline from both parts, with the correct answer and what the AI said. Available once you have
-        finished both parts with the same code.
+        finished both parts with the same code, in this browser.
       </p>
-      <form
-        className="card"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (CODE_RE.test(normalised)) void load(normalised);
-        }}
-      >
-        <div className="field">
-          <label htmlFor="results-code">Your code</label>
-          <input
-            id="results-code"
-            className="input"
-            type="text"
-            autoComplete="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            maxLength={24}
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
+      {loading && <div className="skeleton" style={{ height: 120 }} aria-busy="true" aria-label="Loading" />}
+      {error && (
+        <div className="notice notice--error" role="alert">
+          {error}
         </div>
-        {error && (
-          <div className="notice notice--error" role="alert">
-            {error}
-          </div>
-        )}
-        <button className="btn btn--primary" type="submit" disabled={!CODE_RE.test(normalised) || busy}>
-          {busy ? "Loading…" : "Show my results"}
-        </button>
-      </form>
+      )}
       {results && results.parts.map((p) => <Part key={p.condition} part={p} />)}
     </>
   );

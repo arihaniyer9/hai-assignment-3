@@ -62,7 +62,7 @@ const OTHER: Record<Condition, { path: string; name: string }> = {
   assisted: { path: "/baseline", name: "the part on your own" },
 };
 
-export function DoneStep({ summary }: { summary: DebriefSummary }) {
+export function DoneStep({ summary, sessionId }: { summary: DebriefSummary; sessionId: string }) {
   const other = OTHER[summary.condition];
   return (
     <section className="card container--narrow" aria-labelledby="done-title">
@@ -79,7 +79,7 @@ export function DoneStep({ summary }: { summary: DebriefSummary }) {
       </p>
       <p>
         Once you have finished both parts, you can see every headline, the correct answers and how the AI
-        compared: <Link href={`/results?code=${encodeURIComponent(summary.code)}`}>see your results</Link>. The
+        compared: <Link href={`/results?session=${encodeURIComponent(sessionId)}`}>see your results</Link>. The
         page stays locked until both parts are done, so that seeing answers cannot affect the other part.
       </p>
       <p className="muted small">

@@ -1,0 +1,1442 @@
+{
+ "h0028b442": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h02509370": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h027b9e10": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h02b66b9e": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h054b6236": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h074ab000": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h07f30820": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h086ef39e": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h09637361": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h0a992df3": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h0c3da1ac": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h0cae93f7": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h114f10e9": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h123b2838": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h12a8a447": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h12b72e17": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h15b905f5": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h17678f79": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h1822a23e": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h1823ccb1": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h18c6f726": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h1b8e00dd": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h1d1d5ccb": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h1d3fda9f": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h1dc40eec": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h1dd62703": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h1ea14d7d": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h1fe6ac4b": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "self_referential_satire"
+ },
+ "h205c8827": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h222c86dd": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h2267a467": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h22b7a7ac": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h24f5613a": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h263ae194": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h2719dcd6": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h27b6305e": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h29fe041f": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h2bb744c0": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h2c6de5dd": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h2ca96b02": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h2e2eb141": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h2e342f0c": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h305d9b12": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h314c0d24": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h31fe9c77": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h32c11699": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h3428be95": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h344e00fa": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h354fabb0": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h35e0560c": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "self_referential_satire"
+ },
+ "h36b86821": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h3712c342": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h3821bd5e": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h390d2bf0": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h39286c9e": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h3946c197": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h39aed859": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h39c44170": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h3a8f16b3": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h3aa3a2ac": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h3ab76d9e": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h3b8571c1": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h414c157d": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h42b8e741": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "political_satire_news_voice"
+ },
+ "h44ddb400": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h45921413": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h4616620c": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "plain_sentence_satire"
+ },
+ "h46666aa0": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h477e9c7e": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h47efbf88": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h49dfe436": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h4a086562": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h4cbf1cdf": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h4ebeb8aa": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h4f6d1e79": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h4fd2a9a5": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h5029a76f": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h512705bc": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h51d70275": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h5322cffc": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h53bd52be": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h54caa8a4": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h54e536ec": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h5666e7d9": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h57179ac3": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h5b234a1a": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h5b489022": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h5bb0c848": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h5c82eea7": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h5ff1a086": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h60b50bc8": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h62373a70": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h6246bdf3": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h63511689": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h63d0c871": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h67606e47": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h69672ee9": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h6a6db1dd": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h6aac58ee": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h6ac2b36e": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "science_wording_trap"
+ },
+ "h6b7e9f16": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h6e9e40df": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h6f812109": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h6faac27e": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h6fdf42c4": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "political_satire_news_voice"
+ },
+ "h70d28d87": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h70e62b0e": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h717145d3": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h71a5f2a3": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h71c573f9": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h73f1d118": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h75d2c50f": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "h7745921b": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h77abfc0f": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h7932ee03": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h7a71b981": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h7af0573d": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h7bda6dab": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h7c68b78e": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h7cb22da3": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h7d2c0eab": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h7da4e67f": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h7e6b1878": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h81d858c9": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h8240b252": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "science_wording_trap"
+ },
+ "h82e9928d": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h8728e986": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "science_wording_trap"
+ },
+ "h880a8f03": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h8bc106b5": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "plain_sentence_satire"
+ },
+ "h8cb52c6c": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h8f924c39": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "h92fc4035": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h93612c50": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h9404f559": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h9581f68d": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h95967877": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "h9a0922e0": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "h9ab44ecf": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "ha0ea0166": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "ha23e6e93": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "ha2a0781c": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "ha2ebf95f": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "ha32231c1": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "ha3bfb08c": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "political_satire_news_voice"
+ },
+ "ha59b84c2": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "ha5f1dc00": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "ha7b158df": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "haac02b07": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "haf920f99": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "hafc306b5": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hafd02cd4": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hb0907709": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hb14d9f48": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hb1d9f0e0": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hb4fde2a4": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "hb53e8a77": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hb62bbcac": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hb672f505": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "hb6b0d59b": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hb6befa19": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hb8db8b77": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "hb8eac88a": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hb9e7f244": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hbbd5e104": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hbc13167b": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hbcae468d": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "hbdfcc0a4": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hbf251dcf": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hc04f1799": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hc0d86f2a": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hc14f75fd": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "political_satire_news_voice"
+ },
+ "hc23b189c": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "self_referential_satire"
+ },
+ "hc3bb918d": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "hc45eb3ce": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hc481e9c4": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hc4ec2a7c": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hc5459a3a": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hc59081b0": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "plain_sentence_satire"
+ },
+ "hc645d685": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hc7959cdd": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hc7e593f0": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "hc8872c67": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hcc76cf79": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hcd044382": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hcd4c5658": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hcd6ef548": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "plain_sentence_satire"
+ },
+ "hce959472": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "hcf77d90c": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "science_wording_trap"
+ },
+ "hcfbb3978": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "political_satire_news_voice"
+ },
+ "hd2e66482": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "hd37e248c": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hd5fa9ba8": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hd69f6608": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hd7191257": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "hd7b5c29f": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "hd7cadda0": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hd7db8a65": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hd9c97188": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hdb96beb7": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hde788bf1": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he1435e2d": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he197c0df": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he21d09cf": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he22490a9": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "he30d546e": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "he36901ea": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he4602690": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he525a2de": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "he5990837": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "he5c99901": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he5ec71d9": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he71502f3": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "he732faa3": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he7946270": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he7c84785": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "he8b95933": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "he9053063": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "he95afa78": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "he9c8da8b": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "heb272313": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "heb6cfe85": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hecf96819": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "hedebf909": {
+  "type": "real_absurd",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "absurd_true_event"
+ },
+ "hedf93f20": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hefc48f62": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hf1d45dea": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hf2ad1349": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "political_satire_news_voice"
+ },
+ "hf2ce10e6": {
+  "type": "plain_real",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": false,
+  "a2_error_category": "ordinary_news_voice"
+ },
+ "hf427bca2": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hf4760284": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hf4929347": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "plain_sentence_satire"
+ },
+ "hf5bd54c7": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hf90d46f0": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Satire",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hf9fa7976": {
+  "type": "real_absurd",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hfa249794": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hfa2afdc1": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "hfb3b3d89": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ },
+ "hfb3bbf48": {
+  "type": "obvious_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "hfc59fd65": {
+  "type": "subtle_satire",
+  "a2_model_pred": "Real",
+  "a2_model_correct": false,
+  "a2_error_category": "format_template_satire"
+ },
+ "hfe96335f": {
+  "type": "plain_real",
+  "a2_model_pred": "Real",
+  "a2_model_correct": true,
+  "a2_error_category": null
+ }
+}

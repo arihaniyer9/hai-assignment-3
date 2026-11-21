@@ -151,7 +151,7 @@ export function StudyApp({ condition }: { condition: Condition }) {
 
   if (session.status === "done") {
     return summary ? (
-      <DoneStep summary={summary} />
+      <DoneStep summary={summary} sessionId={session.sessionId} />
     ) : (
       <div className="notice notice--error" role="alert">
         {error ?? "Loading your score…"}

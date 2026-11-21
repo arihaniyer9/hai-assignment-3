@@ -25,8 +25,8 @@ export default function HomePage() {
         </Link>
       </div>
       <p>
-        Finished both parts? <Link href="/results">See your results</Link>: every headline, the correct answers and
-        how the AI compared.
+        Finished both parts? Your results (every headline, the correct answers and how the AI compared) open from
+        the thank-you screen, or from <Link href="/results">this page</Link> in the browser you used.
       </p>
     </div>
   );

@@ -66,7 +66,8 @@ export const api = {
   complete: (id: string, comment: string) =>
     request<DebriefSummary>(`/api/sessions/${id}/complete`, post({ comment })),
   summary: (id: string) => request<DebriefSummary>(`/api/sessions/${id}/summary`),
-  results: (code: string) => request<ParticipantResults>(`/api/results?code=${encodeURIComponent(code)}`),
+  results: (sessionId: string) =>
+    request<ParticipantResults>(`/api/results?session=${encodeURIComponent(sessionId)}`),
   adminLogin: (password: string) => request<{ ok: true }>("/api/admin/login", post({ password })),
   adminLogout: () => request<{ ok: true }>("/api/admin/logout", { method: "POST" }),
   adminData: () =>

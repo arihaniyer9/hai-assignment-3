@@ -132,7 +132,6 @@ export interface PartResults {
 }
 
 export interface ParticipantResults {
-  code: string;
   parts: PartResults[];
 }
 

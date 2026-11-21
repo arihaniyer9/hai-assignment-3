@@ -18,7 +18,9 @@
  *     an assisted trial (the AI has been seen by then); each change is counted. Otherwise answers are
  *     write-once (a retry with the same values is accepted);
  *   - the results page (every headline, the correct answer, the AI's answer) unlocks only when the
- *     code has finished BOTH conditions, so nothing learned there can affect the other condition;
+ *     code has finished BOTH conditions, so nothing learned there can affect the other condition. It
+ *     is looked up by a session id, which only the participant's own browser holds, never by the
+ *     code (some participants used their uniqname as their code);
  *   - the AI output is computed live, logged once, and the same logged output is returned on reload;
  *   - ground truth never leaves the server before completion, and then only as a score.
  */
@@ -352,12 +354,15 @@ export async function getSummary(id: string, storage?: Storage): Promise<Debrief
 /**
  * Every headline of both parts with the participant's answer, the correct answer and the AI's
  * answer: as shown in the AI part, and as it would have been (never shown) in the baseline part.
+ * Looked up by one of the participant's session ids; the response never contains the code.
  *
- * @throws ServiceError `forbidden` unless this code has finished both conditions.
+ * @throws ServiceError `not_found` for an unknown session, `forbidden` unless the session's code
+ *   has finished both conditions.
  */
-export async function getResults(code: string, storage?: Storage): Promise<ParticipantResults> {
+export async function getResults(sessionId: string, storage?: Storage): Promise<ParticipantResults> {
   const store = storage ?? (await getStorage());
-  const done = (await store.sessionsForCode(code)).filter((s) => s.completedAt && !s.terminatedAt);
+  const own = await requireSession(store, sessionId);
+  const done = (await store.sessionsForCode(own.code)).filter((s) => s.completedAt && !s.terminatedAt);
   if (!CONDITIONS.every((c) => done.some((s) => s.condition === c))) {
     throw new ServiceError("forbidden", "Your results unlock once you have finished both parts with this code.");
   }
@@ -390,5 +395,5 @@ export async function getResults(code: string, storage?: Storage): Promise<Parti
       switchedToWrong: switched ? switched.filter((t) => t.finalAnswer !== t.label).length : null,
     });
   }
-  return { code, parts };
+  return { parts };
 }
